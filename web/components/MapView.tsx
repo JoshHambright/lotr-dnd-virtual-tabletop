@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FogShape } from '../../shared/fog.js'
+import type { FogMask, FogShape } from '../../shared/fog.js'
 import { toCells } from '../../shared/fog.js'
 import type { Scene, Token } from '../../shared/state.js'
 import type { TableClient } from '../client.js'
@@ -55,7 +55,7 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const viewRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef<DragState | null>(null)
-  const fogCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const fogLayerRef = useRef<FogLayer | null>(null)
   const [measurement, setMeasurement] = useState<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null)
   const [fitted, setFitted] = useState<string | null>(null)
 
@@ -113,7 +113,7 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
       drawTokens(context, current, tokens, selectedTokenId, view, client.roomCode, gmKey, asPlayer)
 
       if (current.fog.enabled) {
-        drawFog(context, current, fogCanvasRef, asPlayer)
+        drawFog(context, current, fogLayerRef, asPlayer)
       }
 
       drawCursors(context, client, current.id, view)
@@ -314,45 +314,63 @@ function drawGrid(context: CanvasRenderingContext2D, scene: Scene, view: Viewpor
 function drawFog(
   context: CanvasRenderingContext2D,
   scene: Scene,
-  ref: React.MutableRefObject<HTMLCanvasElement | null>,
+  cache: React.MutableRefObject<FogLayer | null>,
   asPlayer: boolean,
 ): void {
   const mask = scene.fog.mask
-  let offscreen = ref.current
-  if (!offscreen) {
-    offscreen = document.createElement('canvas')
-    ref.current = offscreen
-  }
-  if (offscreen.width !== mask.cols || offscreen.height !== mask.rows) {
-    offscreen.width = mask.cols
-    offscreen.height = mask.rows
+  let layer = cache.current
+
+  if (!layer) {
+    layer = { canvas: document.createElement('canvas'), mask: null, asPlayer }
+    cache.current = layer
   }
 
-  const offContext = offscreen.getContext('2d')
-  if (!offContext) return
+  // The mask is replaced wholesale whenever fog changes, so its identity is a
+  // sound cache key. Without this the layer would be re-expanded and a fresh
+  // ImageData allocated sixty times a second for fog that is not moving.
+  if (layer.mask !== mask || layer.asPlayer !== asPlayer) {
+    const { canvas } = layer
+    if (canvas.width !== mask.cols || canvas.height !== mask.rows) {
+      canvas.width = mask.cols
+      canvas.height = mask.rows
+    }
 
-  const cells = toCells(mask)
-  const image = offContext.createImageData(mask.cols, mask.rows)
-  // Players get a wall of near-black. The GM gets a cool slate veil instead:
-  // dark enough to read as "covered" at a glance, but tinted away from the
-  // map's own browns so the difference is obvious even on an unlit battlemat,
-  // and sheer enough to keep working through.
-  const [r, g, b, alpha] = asPlayer ? [6, 5, 4, 255] : [38, 44, 58, 168]
-  for (let i = 0; i < cells.length; i++) {
-    if (cells[i]) continue
-    const p = i * 4
-    image.data[p] = r!
-    image.data[p + 1] = g!
-    image.data[p + 2] = b!
-    image.data[p + 3] = alpha!
+    const offContext = canvas.getContext('2d')
+    if (!offContext) return
+
+    const cells = toCells(mask)
+    const image = offContext.createImageData(mask.cols, mask.rows)
+    // Players get a wall of near-black. The GM gets a cool slate veil instead:
+    // dark enough to read as "covered" at a glance, but tinted away from the
+    // map's own browns so the difference is obvious even on an unlit battlemat,
+    // and sheer enough to keep working through.
+    const [r, g, b, alpha] = asPlayer ? [6, 5, 4, 255] : [38, 44, 58, 168]
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i]) continue
+      const p = i * 4
+      image.data[p] = r!
+      image.data[p + 1] = g!
+      image.data[p + 2] = b!
+      image.data[p + 3] = alpha!
+    }
+    offContext.putImageData(image, 0, 0)
+
+    layer.mask = mask
+    layer.asPlayer = asPlayer
   }
-  offContext.putImageData(image, 0, 0)
 
   context.save()
   context.imageSmoothingEnabled = true
   context.imageSmoothingQuality = 'high'
-  context.drawImage(offscreen, 0, 0, scene.width, scene.height)
+  context.drawImage(layer.canvas, 0, 0, scene.width, scene.height)
   context.restore()
+}
+
+/** The rendered fog, kept until the mask it was built from is replaced. */
+interface FogLayer {
+  canvas: HTMLCanvasElement
+  mask: FogMask | null
+  asPlayer: boolean
 }
 
 function drawTokens(
