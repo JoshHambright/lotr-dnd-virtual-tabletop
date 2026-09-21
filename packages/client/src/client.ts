@@ -14,6 +14,8 @@ import type { Op, Presence, Role, RoomState } from '@vtt/core'
 import { emptyRoom } from '@vtt/core'
 import type { ClientMessage, ServerMessage } from '@vtt/protocol'
 import type { RollMode } from '@vtt/dice'
+import type { Transport } from './transport.js'
+import { WebSocketTransport } from './transport.js'
 
 export type ConnectionStatus = 'connecting' | 'open' | 'reconnecting' | 'closed'
 
@@ -42,7 +44,7 @@ export class TableClient {
   /** Bumped on every roll so the dice tray knows to animate a new one. */
   rollCount = 0
 
-  #socket: WebSocket | null = null
+  #transport: Transport | null = null
   #attempt = 0
   #heartbeat: ReturnType<typeof setInterval> | null = null
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -67,6 +69,11 @@ export class TableClient {
     readonly roomCode: string,
     readonly name: string,
     private gmKeyValue: string | null,
+    /**
+     * Injected for the demo and for multi-client tests. Left out in the app,
+     * where a websocket to the table server is built from the room code.
+     */
+    private readonly injectedTransport?: Transport,
   ) {
     this.#usingGmKey = gmKeyValue !== null
   }
@@ -104,69 +111,67 @@ export class TableClient {
 
   connect(): void {
     this.#closedByUs = false
+
+    const transport = this.injectedTransport ?? new WebSocketTransport(this.#url())
+    this.#transport = transport
+
+    transport.open({
+      onOpen: () => {
+        this.#attempt = 0
+        this.#openedOnce = true
+        this.status = 'open'
+        this.lastError = null
+        this.#heartbeat = setInterval(() => this.#send({ k: 'ping' }), HEARTBEAT_MS)
+        this.#emit(true)
+      },
+
+      onMessage: (raw) => this.#receive(JSON.parse(raw) as ServerMessage),
+
+      onClose: () => {
+        this.#stopHeartbeat()
+        if (this.#closedByUs) {
+          this.status = 'closed'
+          this.#emit(true)
+          return
+        }
+
+        // A socket that never opened while we were presenting a GM key means
+        // the server refused the key — a stale one left in this browser from a
+        // table that has since been reopened. Rejoin as a player rather than
+        // locking someone out of their own game night.
+        if (!this.#openedOnce && this.#usingGmKey) {
+          this.#usingGmKey = false
+          this.gmKeyValue = null
+          this.demotedFromGm = true
+          this.status = 'connecting'
+          this.#emit(true)
+          this.connect()
+          return
+        }
+
+        this.status = 'reconnecting'
+        this.#emit(true)
+        this.#scheduleReconnect()
+      },
+    })
+  }
+
+  #url(): string {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     const params = new URLSearchParams({ name: this.name })
     if (this.#usingGmKey && this.gmKeyValue) {
       params.set('key', this.gmKeyValue)
       params.set('role', 'gm')
     }
-
-    const socket = new WebSocket(
-      `${protocol}://${location.host}/api/room/${encodeURIComponent(this.roomCode)}/ws?${params}`,
-    )
-    this.#socket = socket
-
-    socket.addEventListener('open', () => {
-      this.#attempt = 0
-      this.#openedOnce = true
-      this.status = 'open'
-      this.lastError = null
-      this.#heartbeat = setInterval(() => this.#send({ k: 'ping' }), HEARTBEAT_MS)
-      this.#emit(true)
-    })
-
-    socket.addEventListener('message', (event) => {
-      if (typeof event.data !== 'string') return
-      this.#receive(JSON.parse(event.data) as ServerMessage)
-    })
-
-    socket.addEventListener('close', () => {
-      this.#stopHeartbeat()
-      if (this.#closedByUs) {
-        this.status = 'closed'
-        this.#emit(true)
-        return
-      }
-      // A socket that never opened while we were presenting a GM key means
-      // the server refused the key — a stale one left in this browser from a
-      // table that has since been reopened. Rejoin as a player rather than
-      // locking someone out of their own game night.
-      if (!this.#openedOnce && this.#usingGmKey) {
-        this.#usingGmKey = false
-        this.gmKeyValue = null
-        this.demotedFromGm = true
-        this.status = 'connecting'
-        this.#emit(true)
-        this.connect()
-        return
-      }
-
-      this.status = 'reconnecting'
-      this.#emit(true)
-      this.#scheduleReconnect()
-    })
-
-    socket.addEventListener('error', () => {
-      // 'close' always follows, and that is where reconnection is handled.
-    })
+    return `${protocol}://${location.host}/api/room/${encodeURIComponent(this.roomCode)}/ws?${params}`
   }
 
   disconnect(): void {
     this.#closedByUs = true
     this.#stopHeartbeat()
     if (this.#reconnectTimer) clearTimeout(this.#reconnectTimer)
-    this.#socket?.close()
-    this.#socket = null
+    this.#transport?.close()
+    this.#transport = null
     this.status = 'closed'
     this.#emit(true)
   }
@@ -242,7 +247,7 @@ export class TableClient {
   }
 
   #send(message: ClientMessage): void {
-    if (this.#socket?.readyState === WebSocket.OPEN) this.#socket.send(JSON.stringify(message))
+    this.#transport?.send(JSON.stringify(message))
   }
 
   // --- Sending intents -------------------------------------------------------

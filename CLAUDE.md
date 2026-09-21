@@ -53,6 +53,19 @@ decision, not an agent's call.
 2. Each agent works in its own git worktree and opens its own PR.
 3. The full gate suite runs per PR, not at integration time.
 
+## The demo
+
+`pnpm demo` builds a standalone bundle in `packages/client/dist-demo`: the real
+UI and the real rules engine against a server running in the same tab
+(`packages/client/src/demo/`). It is not a mock — it calls the same
+`authorize`, `reduce`, `projectOp` and dice roller the real server calls, over
+the same protocol. What it leaves out is the network, storage and other people.
+
+Its seat switch is the point: flipping to a player rebuilds what the browser
+has been _sent_, so the staged map and the hidden ambusher are not hidden, they
+are gone. Keep that honest — if the demo ever has to special-case something to
+look right, the filtering is wrong, not the demo.
+
 ## Commands
 
 ```bash
@@ -61,6 +74,7 @@ pnpm verify          # lint, format, types, coverage, build — what CI runs
 pnpm test            # unit tests
 pnpm coverage        # with thresholds; core is gated at 90% lines
 pnpm dev             # the Cloudflare adapter, on :8787
+pnpm demo            # build the standalone demo
 ```
 
 ## Conventions

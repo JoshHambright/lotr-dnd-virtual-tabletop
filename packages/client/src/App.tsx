@@ -44,8 +44,17 @@ export function App() {
   return <Table key={joined.code + joined.name} joined={joined} onLeave={() => setJoined(null)} />
 }
 
-function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
-  const client = useMemo(() => new TableClient(joined.code, joined.name, joined.gmKey), [joined])
+export function Table({
+  joined,
+  onLeave,
+  client: injected,
+}: {
+  joined: Joined
+  onLeave: () => void
+  /** Supplied by the demo, which runs a server in the same tab. */
+  client?: TableClient
+}) {
+  const client = useMemo(() => injected ?? new TableClient(joined.code, joined.name, joined.gmKey), [joined, injected])
 
   useEffect(() => {
     client.connect()

@@ -19,7 +19,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm coverage && pnpm build"
+    "verify": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm coverage && pnpm build",
+    "demo": "pnpm --filter @vtt/client build:demo"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

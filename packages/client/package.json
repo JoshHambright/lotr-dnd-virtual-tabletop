@@ -6,7 +6,8 @@
   "description": "The browser app: map, tokens, fog, dice and sheets",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "build:demo": "vite build --config vite.demo.config.ts"
   },
   "dependencies": {
     "@vtt/core": "workspace:*",

@@ -1,0 +1,84 @@
+/* Chrome around the demo. The app itself is untouched. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  padding: 10px 14px;
+  background: #221b12;
+  border-bottom: 1px solid var(--gold-dim);
+}
+
+.demo-bar__what {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.demo-bar__what strong {
+  font-family: var(--serif);
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.demo-bar__what span {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.demo-bar__seats {
+  display: flex;
+  gap: 6px;
+}
+
+.demo-hint {
+  padding: 8px 14px;
+  background: #1a1510;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.demo-hint strong {
+  color: var(--gold);
+}
+
+.demo-hint em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* The app fills whatever is left. */
+.demo-app {
+  flex: 1;
+  min-height: 0;
+}
+
+.demo-app > .table {
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .demo-hint {
+    font-size: 0.8rem;
+  }
+}
