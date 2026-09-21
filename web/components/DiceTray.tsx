@@ -7,9 +7,10 @@
  * on the GM's screen skitters left on everyone's, and lands on the same face.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Roll } from '../../shared/state.js'
-import { criticalKind, describeResult } from '../../shared/dice.js'
+import { RollDetail } from './RollDetail.js'
+import { criticalKind } from '../../shared/dice.js'
 
 const TUMBLE_MS = 900
 const SETTLE_MS = 350
@@ -42,13 +43,14 @@ export function DiceTray({ roll, nonce }: Props) {
     return () => clearTimeout(timer)
   }, [roll, nonce])
 
+  const dice = useMemo(() => (roll ? layOutDice(roll) : []), [roll])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !roll || !visible) return
     const context = canvas.getContext('2d')
     if (!context) return
 
-    const dice = layOutDice(roll)
     const started = performance.now()
     let frame = 0
 
@@ -94,7 +96,7 @@ export function DiceTray({ roll, nonce }: Props) {
 
     frame = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(frame)
-  }, [roll, visible, nonce])
+  }, [dice, roll, visible, nonce])
 
   if (!roll || !visible) return null
 
@@ -107,11 +109,18 @@ export function DiceTray({ roll, nonce }: Props) {
         {roll.label ? <span className="dice-tray__label">{roll.label}</span> : null}
         {roll.visibility === 'gm' ? <span className="dice-tray__badge">behind the screen</span> : null}
       </div>
-      <canvas ref={canvasRef} className="dice-tray__canvas" />
-      <div className="dice-tray__detail">{describeResult(roll.result)}</div>
+      <canvas ref={canvasRef} className="dice-tray__canvas" style={{ height: trayHeight(dice.length) }} />
+      <div className="dice-tray__detail">
+        <RollDetail result={roll.result} />
+      </div>
       <div className={`dice-tray__total${critical ? ` dice-tray__total--${critical}` : ''}`}>{roll.result.total}</div>
     </div>
   )
+}
+
+/** Four dice to a row at the tray's width; enough height for the rows needed. */
+function trayHeight(count: number): number {
+  return Math.min(168, Math.max(56, Math.ceil(Math.max(1, count) / 4) * 52 + 8))
 }
 
 /**
@@ -159,7 +168,9 @@ function drawDie(
   context.save()
   context.translate(x, y)
   context.rotate(angle)
-  context.globalAlpha = kept ? 1 : 0.35
+  // A dropped die still has to be readable — it is evidence that advantage
+  // was taken, and a blank disc with a line through it proves nothing.
+  context.globalAlpha = kept ? 1 : 0.62
 
   const radius = size / 2
   tracePolygon(context, radius, cornersFor(sides))
@@ -175,7 +186,7 @@ function drawDie(
   context.stroke()
 
   context.rotate(-angle)
-  context.fillStyle = kept ? '#f4e9d4' : '#8d8371'
+  context.fillStyle = kept ? '#f4e9d4' : '#c4b79f'
   context.font = `600 ${size * 0.42}px ui-serif, Georgia, serif`
   context.textAlign = 'center'
   context.textBaseline = 'middle'

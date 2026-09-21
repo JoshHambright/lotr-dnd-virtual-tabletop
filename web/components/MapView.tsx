@@ -333,15 +333,18 @@ function drawFog(
 
   const cells = toCells(mask)
   const image = offContext.createImageData(mask.cols, mask.rows)
-  // The GM keeps a window on what is still covered; players get a wall.
-  const alpha = asPlayer ? 255 : 150
+  // Players get a wall of near-black. The GM gets a cool slate veil instead:
+  // dark enough to read as "covered" at a glance, but tinted away from the
+  // map's own browns so the difference is obvious even on an unlit battlemat,
+  // and sheer enough to keep working through.
+  const [r, g, b, alpha] = asPlayer ? [6, 5, 4, 255] : [38, 44, 58, 168]
   for (let i = 0; i < cells.length; i++) {
     if (cells[i]) continue
     const p = i * 4
-    image.data[p] = 8
-    image.data[p + 1] = 6
-    image.data[p + 2] = 5
-    image.data[p + 3] = alpha
+    image.data[p] = r!
+    image.data[p + 1] = g!
+    image.data[p + 2] = b!
+    image.data[p + 3] = alpha!
   }
   offContext.putImageData(image, 0, 0)
 

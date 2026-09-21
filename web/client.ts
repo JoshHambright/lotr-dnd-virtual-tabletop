@@ -245,7 +245,23 @@ export class TableClient {
 
   // --- Sending intents -------------------------------------------------------
 
+  /**
+   * Sends an operation, and for the GM applies it locally at once.
+   *
+   * Without this a GM's own checkbox visibly flips back for the length of one
+   * round trip before the server's echo restores it, because the control is
+   * driven by room state rather than by local state. Applying first is safe
+   * here for two reasons: every operation a client can send is idempotent, so
+   * the echo re-applying it changes nothing; and the GM is authorized for all
+   * of them, so there is no refusal to roll back. Players' operations are
+   * rewritten server-side before they are allowed, so they wait for the echo —
+   * except token drags, which have their own optimistic path.
+   */
   send(op: Op): void {
+    if (this.role === 'gm') {
+      this.room = reduce(this.room, op)
+      this.#emit(op.t !== 'token.move')
+    }
     this.#send({ k: 'op', op })
   }
 

@@ -113,7 +113,7 @@ describe('roll', () => {
 describe('reporting', () => {
   it('writes a log line showing dropped dice', () => {
     const result = roll('1d20+3', 'advantage', sequence([2, 19]))
-    expect(describeResult(result)).toBe('2d20kh1 [~~2~~, 19] + 3')
+    expect(describeResult(result)).toBe('2d20kh1 [(2), 19] + 3')
   })
 
   it('flags a natural twenty that was kept', () => {

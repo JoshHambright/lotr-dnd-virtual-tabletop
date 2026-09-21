@@ -9,8 +9,9 @@
 import { useState } from 'react'
 import type { Roll } from '../../shared/state.js'
 import type { RollMode } from '../../shared/dice.js'
-import { criticalKind, describeResult } from '../../shared/dice.js'
+import { criticalKind } from '../../shared/dice.js'
 import type { TableClient } from '../client.js'
+import { RollDetail } from './RollDetail.js'
 
 const QUICK_DICE = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']
 
@@ -113,7 +114,9 @@ function RollEntry({ roll }: { roll: Roll }) {
         </time>
       </div>
       <div className="roll-log__body">
-        <span className="roll-log__detail">{describeResult(roll.result)}</span>
+        <span className="roll-log__detail">
+          <RollDetail result={roll.result} />
+        </span>
         <span className={`roll-log__total${critical ? ` roll-log__total--${critical}` : ''}`}>{roll.result.total}</span>
       </div>
     </li>

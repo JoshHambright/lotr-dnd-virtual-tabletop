@@ -224,15 +224,17 @@ function markKept(rolls: DieRoll[], keep: { kind: 'kh' | 'kl' | 'dh' | 'dl'; n: 
   })
 }
 
-/** A one-line summary for the roll log, e.g. "2d20kh1 [17, 4] + 3". */
+/**
+ * A one-line plain-text summary, e.g. "2d20kh1 [17, (4)] + 3". Dropped dice
+ * are parenthesised rather than struck through, because this string goes
+ * places that cannot render formatting; the roll log draws its own strikethrough.
+ */
 export function describeResult(result: RollResult): string {
   return result.terms
     .map((term, index) => {
       const op = index === 0 ? (term.sign === -1 ? '-' : '') : term.sign === -1 ? ' - ' : ' + '
       if (term.kind === 'const') return `${op}${term.value}`
-      const faces = term.rolls
-        .map((r) => (r.kept ? `${r.value}` : `~~${r.value}~~`))
-        .join(', ')
+      const faces = term.rolls.map((r) => (r.kept ? `${r.value}` : `(${r.value})`)).join(', ')
       return `${op}${term.notation} [${faces}]`
     })
     .join('')
