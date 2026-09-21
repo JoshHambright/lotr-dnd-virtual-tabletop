@@ -105,25 +105,30 @@ chain. 184 tests, up from 151. `pnpm verify` passes from a clean clone.
 
 ### Phase 1 — Parallel build _(six independent workstreams)_
 
-| ID  | Workstream     | Owns                                                                                          | Depends on           |
-| --- | -------------- | --------------------------------------------------------------------------------------------- | -------------------- |
-| A   | Node server    | `packages/server` — Fastify, ws, room actors, SQLite, assets                                  | protocol, core       |
-| B   | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `srd5e` pack | pack contract        |
-| C   | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                   | pack contract        |
-| D   | Theming        | `client/theme/**` + three skins                                                               | theme token contract |
-| E   | Docker & ops   | `infra/**` + operations docs                                                                  | nothing              |
-| F   | Test harness   | multi-client e2e against the Node server                                                      | protocol             |
+| ID  | Workstream     | Owns                                                                                                   | Depends on           |
+| --- | -------------- | ------------------------------------------------------------------------------------------------------ | -------------------- |
+| A   | Node server    | `packages/server` — Fastify, ws, room actors, SQLite, assets, export/restore (D-019)                   | protocol, core       |
+| B   | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `lotr5e` pack (D-016) | pack contract        |
+| C   | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                            | pack contract        |
+| D   | Theming        | `client/theme/**` + three skins                                                                        | theme token contract |
+| E   | Docker & ops   | `infra/**` + operations docs                                                                           | nothing              |
+| F   | Test harness   | multi-client e2e against the Node server                                                               | protocol             |
 
 These touch disjoint directories on purpose. The contracts frozen in Phase 0 are
 what let six agents work without stepping on each other.
 
-Exit: `docker compose up` serves a working table with the `srd5e` pack; the
-leak-assertion e2e suite passes against the Node server.
+Exit: `docker compose up` serves a working table with the `lotr5e` pack; the
+leak-assertion e2e suite passes against the Node server; a table can be
+exported and restored.
+
+Workstreams merge into one integration branch as they finish, each gated by
+the full suite, and the phase is reviewed once as a running application
+(D-018).
 
 ### Phase 2 — The other two packs
 
-- `lotr5e` pack, reproducing today's sheet through the pack format — the
-  migration proof that the abstraction is real
+- `srd5e` pack — the second system, which is where the format either holds
+  or does not
 - `morkborg` pack: d20-vs-DR dice profile, four abilities, Omens track, skin
 - SRD content ingestion: monsters, spells and conditions as loadable data
 - Import of the prototype's existing rooms, if any are worth keeping
@@ -134,8 +139,7 @@ app and reshapes the sheets.
 ### Phase 3 — Hardening for real sessions
 
 - Reconnection tested against genuine network loss, not a clean socket close
-- Backup and restore; export a table as JSON _(the gap flagged in the
-  prototype's hosting notes)_
+- Per-player invite tokens, replacing name-derived ids (D-017)
 - Rate limiting, message size caps, abuse resistance on a public tunnel
 - Load check: six clients, sustained token dragging, a large map
 - Accessibility pass: keyboard navigation, focus order, contrast in all three skins
@@ -187,9 +191,9 @@ Rules for parallel work:
 Named here so they are watched rather than discovered.
 
 - **The sheet schema proves too rigid** for MÖRK BORG's Omens or LotR's Shadow.
-  Mitigated by building the `srd5e` pack and the LotR pack against the same
-  schema early — LotR is the awkward one, so Phase 2 tests the abstraction
-  against its hardest case, not its easiest.
+  Mitigated by building the LotR pack first (D-016): it is the awkward one,
+  so the format meets its hardest case in Phase 1, while only one pack has
+  been written against it.
 - **The formula evaluator grows into a language.** Held to arithmetic, `floor`,
   `ceil`, `min`, `max`, `abs` and field references. Anything needing more is a
   code-level pack hook, not a bigger grammar.

@@ -20,7 +20,7 @@ function drawMap(options: {
   const gray = new Float32Array(width * height)
   // Deterministic pseudo-noise, so a failure is reproducible.
   let seed = 12345
-  const random = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+  const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -135,7 +135,7 @@ describe('detectGrid', () => {
 
   it('refuses pure noise', () => {
     let seed = 99
-    const random = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
+    const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff
     const gray = Float32Array.from({ length: 600 * 400 }, () => random() * 255)
     const grid = detectGrid(gray, 600, 400)
     expect(grid === null || grid.confidence < 0.3).toBe(true)

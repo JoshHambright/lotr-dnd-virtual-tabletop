@@ -10,7 +10,7 @@
  * talks on Zoom costs nothing until someone moves a piece.
  */
 
-import { reduce, emptyRoom, MAX_LOG_ENTRIES } from '@vtt/core'
+import { identityFor, reduce, emptyRoom, MAX_LOG_ENTRIES } from '@vtt/core'
 import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
 import { authorize, projectOp, projectState } from '@vtt/core'
 import { DiceError, roll as rollDice } from '@vtt/dice'
@@ -359,7 +359,11 @@ export class TableRoom {
     const state = this.#state
     if (!state) return
 
-    const decision = authorize(message.op, state, { role: attachment.role, name: attachment.name })
+    const decision = authorize(message.op, state, {
+      role: attachment.role,
+      name: attachment.name,
+      id: identityFor(attachment.name),
+    })
     if (!decision.ok) {
       this.#send(ws, { k: 'error', message: decision.reason })
       return

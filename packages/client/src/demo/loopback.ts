@@ -11,7 +11,7 @@
  * because the difference is not a UI toggle: the player is genuinely sent less.
  */
 
-import { reduce } from '@vtt/core'
+import { identityFor, reduce } from '@vtt/core'
 import type { Op, Presence, Role, RoomState } from '@vtt/core'
 import { authorize, projectOp, projectState } from '@vtt/core'
 import { roll as rollDice } from '@vtt/dice'
@@ -96,7 +96,7 @@ export class LoopbackTransport implements Transport {
   }
 
   #applyRequested(op: Op): void {
-    const decision = authorize(op, this.room, { role: this.#role, name: this.#name })
+    const decision = authorize(op, this.room, { role: this.#role, name: this.#name, id: identityFor(this.#name) })
     if (!decision.ok) {
       this.#emit({ k: 'error', message: decision.reason })
       return

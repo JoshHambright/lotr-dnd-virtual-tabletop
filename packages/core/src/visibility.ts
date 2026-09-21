@@ -13,6 +13,8 @@ export interface ActorContext {
   role: Role
   /** The display name the connection joined under. */
   name: string
+  /** Who this connection is, for ownership checks. See core's `identityFor`. */
+  id: string
 }
 
 // --- Projection: what a role may see ----------------------------------------
@@ -283,7 +285,7 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
 
     case 'character.upsert': {
       const existing = state.characters[op.character.id]
-      if (existing && existing.ownerName !== actor.name) return DENIED('That sheet belongs to someone else')
+      if (existing && existing.ownerId !== actor.id) return DENIED('That sheet belongs to someone else')
       // The owner is taken from the connection, never from the payload, and
       // the GM's private notes on the sheet are preserved untouched.
       return {
@@ -292,7 +294,9 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
           t: 'character.upsert',
           character: {
             ...op.character,
+            // Identity comes from the connection, never from the payload.
             ownerName: existing ? existing.ownerName : actor.name,
+            ownerId: existing ? existing.ownerId : actor.id,
             gmNotes: existing ? existing.gmNotes : '',
           },
         },
@@ -302,7 +306,7 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
     case 'character.delete': {
       const existing = state.characters[op.id]
       if (!existing) return DENIED('No such sheet')
-      if (existing.ownerName !== actor.name) return DENIED('That sheet belongs to someone else')
+      if (existing.ownerId !== actor.id) return DENIED('That sheet belongs to someone else')
       return { ok: true, op }
     }
 
@@ -315,5 +319,5 @@ function canPlayerMove(state: RoomState, token: Token, actor: ActorContext): boo
   if (token.locked) return false
   if (state.settings.playersCanMoveAnyToken) return true
   const character = token.characterId ? state.characters[token.characterId] : undefined
-  return character?.ownerName === actor.name
+  return character?.ownerId === actor.id
 }

@@ -77,6 +77,17 @@ pnpm dev             # the Cloudflare adapter, on :8787
 pnpm demo            # build the standalone demo
 ```
 
+## Ownership is checked by id, never by name
+
+`identityFor(name)` in `packages/core/src/state.ts` is the one place a person
+becomes an identity, and every ownership check reads `ownerId`. Today the id is
+derived from the display name, so it carries no more authority than the name
+does — that is known and accepted (D-017).
+
+Do not add a check that compares `ownerName`. The whole point of the
+indirection is that issuing real per-player tokens later changes `identityFor`
+and the join handshake, and nothing else.
+
 ## Two things that look like footguns but are deliberate
 
 - **pdf.js is the `legacy` build, loaded on demand.** The modern build calls

@@ -71,6 +71,15 @@ export interface Character {
   name: string
   /** Display name of the player who owns the sheet; the GM owns NPCs. */
   ownerName: string
+  /**
+   * Who owns the sheet, for permission checks.
+   *
+   * Today this is derived from the display name, so it carries no more
+   * authority than the name does. It exists anyway so that every ownership
+   * check reads an id: issuing real per-player tokens later changes how an id
+   * is minted and nothing else. See `identityFor` and DECISIONS D-017.
+   */
+  ownerId: string
   culture: string
   calling: string
   level: number
@@ -185,7 +194,7 @@ export interface RoomSettings {
  * any data worth migrating, because retrofitting a version field onto rooms
  * already on disk means guessing which shape each one is.
  */
-export const ROOM_SCHEMA_VERSION = 1
+export const ROOM_SCHEMA_VERSION = 2
 
 export interface RoomState {
   /** The schema this room was written with. See `migrateRoom`. */
@@ -423,6 +432,7 @@ export function newCharacter(id: string, name: string, ownerName: string): Chara
     id,
     name,
     ownerName,
+    ownerId: identityFor(ownerName),
     culture: '',
     calling: '',
     level: 1,
@@ -519,6 +529,30 @@ export function migrateRoom(stored: unknown): RoomState {
 
 /** Keyed by the version each one migrates *from*. */
 const ROOM_MIGRATIONS: Record<number, (room: RoomState) => RoomState> = {
-  // No migrations yet — version 1 is the first schema. The next entry will be
-  // `1: (room) => ...` when the shape first changes.
+  // Sheets gained an owner id. Derive it from the name they were owned by,
+  // which is exactly what a name-based identity would have produced.
+  1: (room) => ({
+    ...room,
+    characters: Object.fromEntries(
+      Object.entries(room.characters).map(([id, character]) => [
+        id,
+        { ...character, ownerId: character.ownerId || identityFor(character.ownerName) },
+      ]),
+    ),
+  }),
+}
+
+/**
+ * Turns a display name into the id ownership is checked against.
+ *
+ * The single place a person becomes an identity. Case and surrounding
+ * whitespace are ignored, so "sam " and "Sam" are the same player — which is
+ * the behaviour a name-based scheme should have, and one fewer surprise when
+ * someone retypes their name after a reconnect.
+ *
+ * Deliberately prefixed: when real tokens arrive they mint ids of a different
+ * shape, and a stored `name:sam` must never be mistaken for one.
+ */
+export function identityFor(displayName: string): string {
+  return `name:${displayName.trim().toLowerCase()}`
 }

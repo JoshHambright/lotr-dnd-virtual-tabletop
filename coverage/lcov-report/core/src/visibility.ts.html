@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.63% </span>
+                <span class="strong">93.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>206/220</span>
+                <span class='fraction'>207/221</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.92% </span>
+                <span class="strong">84.21% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>94/112</span>
+                <span class='fraction'>96/114</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.63% </span>
+                <span class="strong">93.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>206/220</span>
+                <span class='fraction'>207/221</span>
             </div>
         
             
@@ -382,7 +382,13 @@
 <a name='L317'></a><a href='#L317'>317</a>
 <a name='L318'></a><a href='#L318'>318</a>
 <a name='L319'></a><a href='#L319'>319</a>
-<a name='L320'></a><a href='#L320'>320</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -676,6 +682,8 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
@@ -716,6 +724,8 @@ export interface ActorContext {
   role: Role
   /** The display name the connection joined under. */
   name: string
+  /** Who this connection is, for ownership checks. See core's `identityFor`. */
+  id: string
 }
 &nbsp;
 // --- Projection: what a role may see ----------------------------------------
@@ -986,7 +996,7 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
 &nbsp;
     case 'character.upsert': {
       const existing = state.characters[op.character.id]
-      if (existing &amp;&amp; existing.ownerName !== actor.name) return DENIED('That sheet belongs to someone else')
+      if (existing &amp;&amp; existing.ownerId !== actor.id) return DENIED('That sheet belongs to someone else')
       // The owner is taken from the connection, never from the payload, and
       // the GM's private notes on the sheet are preserved untouched.
       return {
@@ -995,7 +1005,9 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
           t: 'character.upsert',
           character: {
             ...op.character,
+            // Identity comes from the connection, never from the payload.
             ownerName: existing ? existing.ownerName : actor.name,
+            ownerId: existing ? existing.ownerId : actor.id,
             gmNotes: existing ? existing.gmNotes : '',
           },
         },
@@ -1005,7 +1017,7 @@ export function authorize(op: Op, state: RoomState, actor: ActorContext): Author
     case 'character.delete': {
       const existing = state.characters[op.id]
       if (!existing) return DENIED('No such sheet'<span class="branch-0 cbranch-no" title="branch not covered" >)</span>
-<span class="cstat-no" title="statement not covered" >      if (existing.ownerName !== actor.name) return DENIED('That sheet belongs to someone else')</span>
+<span class="cstat-no" title="statement not covered" >      if (existing.ownerId !== actor.id) return DENIED('That sheet belongs to someone else')</span>
 <span class="cstat-no" title="statement not covered" >      return { ok: true, op }</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
 &nbsp;
@@ -1018,7 +1030,7 @@ function canPlayerMove(state: RoomState, token: Token, actor: ActorContext): boo
   if (token.locked) return false
   if (state.settings.playersCanMoveAnyToken) return true
   const character = token.characterId ? state.characters[token.characterId] : undefined
-  return character?.ownerName === actor.name
+  return character?.ownerId === actor.id
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -1027,7 +1039,7 @@ function canPlayerMove(state: RoomState, token: Token, actor: ActorContext): boo
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-09-21T16:56:20.877Z
+                at 2026-09-21T17:51:10.745Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

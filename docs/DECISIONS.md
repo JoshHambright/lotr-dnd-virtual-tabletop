@@ -234,3 +234,62 @@ Found when CI failed on a clean install while a local typecheck passed: the
 local `node_modules` still held packages hoisted by an earlier npm install.
 pnpm's refusal to hoist surfaced a dependency that was never declared, which is
 exactly what D-013 bought.
+
+---
+
+## D-016 — LotR 5e is the first pack, not SRD 5e
+
+**Decided.** The pack format is proven against the awkward system first.
+
+The plan had SRD 5e first, on the reasoning that the simplest system exercises
+the format on easy ground. Reversed for two reasons: it is the ruleset the
+group actually plays, so it is the one that makes the app usable; and Shadow,
+Hope, Weary and Callings are exactly the things a 5e-shaped schema might not
+express.
+
+If the pack format cannot carry Shadow, that is worth discovering in Phase 1
+with one pack written, not in Phase 2 with three.
+
+---
+
+## D-017 — Ownership by id now, tokens later
+
+**Decided.** Players are identified by a display name, but ownership is checked
+against an _id_, which is currently derived from that name.
+
+Name-only is right for five friends: one code, type your name, play. Its flaw
+is real though — two people typing "Sam" collide, and anyone can claim anyone
+else's sheet.
+
+Deferring the fix does not have to mean paying for it twice. Every ownership
+check reads `ownerId`, and `identityFor(name)` is the single place a name
+becomes one. Issuing per-player invite tokens later changes that function and
+the join handshake; it does not change `authorize`, the sheet model, or the
+reconnect path.
+
+**Consequence:** a trivial-looking indirection that earns nothing today. That
+is the point — it is bought now because it is cheap now.
+
+---
+
+## D-018 — One integration branch
+
+**Decided.** Phase 1 workstreams merge into a single branch as they finish,
+gated by CI, and are reviewed once as a working application.
+
+Six PRs landing faster than anyone can read them is not review, it is a queue.
+Judging the phase as something that runs is worth more than judging six diffs
+that individually look fine.
+
+---
+
+## D-019 — Export and backup in Phase 1
+
+**Decided.** A table can be downloaded as JSON, and restored, before anyone
+runs a campaign on it.
+
+This was Phase 3 on the plan. Moved because the gap is real and asymmetric:
+the work is small — the state is already one serializable object — and the
+thing at risk is a campaign that exists nowhere else. Shipping a tool people
+put months into with no way to get the data out is the kind of decision that
+only looks cheap before it costs something.

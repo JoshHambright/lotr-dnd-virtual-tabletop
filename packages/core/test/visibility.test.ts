@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emptyRoom, newCharacter, newScene, newStatBlock, newToken, reduce } from '@vtt/core'
+import { emptyRoom, identityFor, newCharacter, newScene, newStatBlock, newToken, reduce } from '@vtt/core'
 import type { Op, RoomState } from '@vtt/core'
 import { authorize, projectOpForPlayer, projectStateForPlayer } from '@vtt/core'
 
@@ -209,13 +209,13 @@ describe('what a player is told changed', () => {
 })
 
 describe('what a player may do', () => {
-  const josh = { role: 'player' as const, name: 'Josh' }
-  const sam = { role: 'player' as const, name: 'Sam' }
+  const josh = { role: 'player' as const, name: 'Josh', id: identityFor('Josh') }
+  const sam = { role: 'player' as const, name: 'Sam', id: identityFor('Sam') }
 
   it('lets the GM do anything, unchanged', () => {
     const state = table()
     const op: Op = { t: 'scene.setActive', id: 'staged' }
-    expect(authorize(op, state, { role: 'gm', name: 'GM' })).toEqual({ ok: true, op })
+    expect(authorize(op, state, { role: 'gm', name: 'GM', id: identityFor('GM') })).toEqual({ ok: true, op })
   })
 
   it('lets a player move a token on the table', () => {
@@ -314,7 +314,7 @@ describe('what a player may do', () => {
       table(),
       sam,
     )
-    expect(decision).toMatchObject({ ok: true, op: { character: { ownerName: 'Sam' } } })
+    expect(decision).toMatchObject({ ok: true, op: { character: { ownerName: 'Sam', ownerId: identityFor('Sam') } } })
   })
 
   it('refuses to create a token on a scene that is not on the table', () => {
