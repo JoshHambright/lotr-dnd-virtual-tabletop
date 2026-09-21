@@ -8,8 +8,23 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.4",
     "@vtt/core": "workspace:*",
     "@vtt/dice": "workspace:*",
-    "@vtt/protocol": "workspace:*"
-  }
+    "@vtt/protocol": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "fastify": "^5.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.24.2"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && node dist/server.js",
+    "start": "node dist/server.js"
+  },
+  "main": "dist/server.js"
 }

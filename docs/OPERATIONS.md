@@ -3,13 +3,35 @@
 Written for **Josh**, who runs the server. The GM never touches any of this —
 they get a URL and a GM key.
 
-> Phase 1 work. The commands below are the target shape, not yet runnable.
-
 ## Running it
 
 ```bash
-cp .env.example .env     # set TABLE_SECRET, nothing else is required
+cp .env.example .env
+openssl rand -hex 32     # paste into TABLE_SECRET
 docker compose up -d
+```
+
+The app is then on `http://localhost:8080`, bound to loopback on purpose —
+nothing outside the house can reach it until you start the tunnel.
+
+> **Caveat, stated plainly:** the server, its export and restore, and the whole
+> app have been verified running directly under Node. The Dockerfile and
+> compose file have _not_ been built, because the build environment they were
+> written in has no Docker daemon. Expect to hit something the first time you
+> run `docker compose up`; it is likelier to be a missing build dependency than
+> a design problem, and worth doing once before a session rather than during one.
+
+## Running it without Docker
+
+Useful when you want to see an error without a container in the way:
+
+```bash
+pnpm install
+pnpm --filter @vtt/client build
+pnpm --filter @vtt/server build
+TABLE_SECRET=$(openssl rand -hex 32) \
+  CLIENT_DIR=$PWD/packages/client/dist \
+  node packages/server/dist/server.js
 ```
 
 Two volumes hold everything that matters:
@@ -54,9 +76,18 @@ tar czf backup-$(date +%F).tgz data/
 docker compose start
 ```
 
-Stopping first avoids copying SQLite mid-write. Phase 3 adds an in-app JSON
-export per table, which is the thing to use if you want one campaign rather than
-everything.
+Stopping first avoids copying SQLite mid-write.
+
+For a single campaign rather than everything, the GM can export a table from
+its own URL — this is the copy to keep before trying anything risky:
+
+```bash
+curl -O -J "http://localhost:8080/api/room/CODE/export?key=YOUR_GM_KEY"
+```
+
+Restoring is a POST of that file to `/api/rooms/import`. It opens the table
+under a **new code** rather than overwriting anything, so importing a backup
+can never destroy the campaign you imported it next to.
 
 ## Upgrading
 
@@ -73,8 +104,14 @@ release notes mention a migration.
 The tunnel puts this on the public internet, so what protects a table is:
 
 - **The table code** — knowing it is what makes you a player.
-- **The GM key** — the only real credential, compared in constant time.
-- Rate limiting and message size caps (Phase 3).
+- **The GM key** — the only real credential. Derived from the table code and
+  `TABLE_SECRET` rather than stored, so it survives a restart and a leaked
+  database row is not a key by itself. Compared in constant time.
+- Message size caps, and schema validation on every frame before it reaches
+  the game state. Rate limiting is Phase 3.
+
+Keep `TABLE_SECRET` out of the repository and out of chat. Changing it
+invalidates every GM key you have handed out.
 
 There are no user accounts, by design. Anyone with a table code can join as a
 player; that's the intent for a group of friends. It also means a code posted

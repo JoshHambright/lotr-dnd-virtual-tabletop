@@ -32,7 +32,7 @@ export default tseslint.config(
 
   // Scripts are operator tools; printing is the point.
   {
-    files: ['scripts/**/*.{js,mjs}'],
+    files: ['scripts/**/*.{js,mjs}', '**/build.mjs'],
     languageOptions: {
       globals: {
         process: 'readonly',

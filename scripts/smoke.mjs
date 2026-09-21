@@ -60,38 +60,36 @@ async function main() {
   )
 
   // --- Uploading a map -------------------------------------------------------
-  // A 1x1 PNG is enough; nothing here inspects the pixels.
-  const png = Uint8Array.from(
-    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
-    (c) => c.charCodeAt(0),
-  )
-  const liveAsset = await (
-    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, {
+  // Two 1x1 PNGs of *different* colours. They must differ byte for byte: the
+  // self-hosted store is content-addressed, so uploading the same image twice
+  // yields one id, and this test's whole point is telling two assets apart.
+  //
+  // That dedup is safe rather than a hole. An id a player can fetch is one
+  // whose bytes are already reachable through something visible, so sharing an
+  // id between a staged map and a live one can only ever return a picture they
+  // could already see.
+  const decode = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+  const pngRed = decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4oaEBAALUARkFUI+kAAAAAElFTkSuQmCC')
+  const pngBlue = decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQCDgBAAHkAUEYgvCnAAAAAElFTkSuQmCC')
+  const upload = async (bytes, key = gmKey) =>
+    fetch(`${BASE}/api/room/${code}/asset${key ? `?key=${key}` : ''}`, {
       method: 'PUT',
       headers: { 'content-type': 'image/png' },
-      body: png,
+      body: bytes,
     })
-  ).json()
-  const stagedAsset = await (
-    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/png' },
-      body: png,
-    })
-  ).json()
+
+  const liveAsset = await (await upload(pngRed)).json()
+  const stagedAsset = await (await upload(pngBlue)).json()
+  check('the two test maps are genuinely different assets', liveAsset.id !== stagedAsset.id)
   check('the GM can upload a map', Boolean(liveAsset.id))
 
-  const playerUpload = await fetch(`${BASE}/api/room/${code}/asset`, {
-    method: 'PUT',
-    headers: { 'content-type': 'image/png' },
-    body: png,
-  })
+  const playerUpload = await upload(pngRed, null)
   check('a player cannot upload', playerUpload.status === 403)
 
   const notAnImage = await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, {
     method: 'PUT',
     headers: { 'content-type': 'application/zip' },
-    body: png,
+    body: pngRed,
   })
   check('non-images are refused', notAnImage.status === 415)
 

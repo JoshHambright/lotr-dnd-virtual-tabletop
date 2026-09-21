@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-demo/
+/data/
+.env
 .wrangler/
 .dev.vars
 *.local

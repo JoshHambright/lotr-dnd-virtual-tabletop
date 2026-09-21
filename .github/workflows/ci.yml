@@ -73,6 +73,39 @@ jobs:
       - name: Smoke test
         run: node scripts/smoke.mjs
 
+  self-hosted:
+    name: The self-hosted server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vtt/client build
+      - run: pnpm --filter @vtt/server build
+
+      - name: Start it
+        run: node packages/server/dist/server.js &
+        env:
+          TABLE_SECRET: a-secret-long-enough-for-continuous-integration
+          DATA_DIR: ${{ runner.temp }}/vtt-data
+          CLIENT_DIR: ${{ github.workspace }}/packages/client/dist
+          PORT: 8080
+      - name: Wait for it
+        run: pnpm exec wait-on http://127.0.0.1:8080/healthz --timeout 90000
+
+      # The same leak assertions the edge adapter faces. One core, one set of
+      # rules, so both hosts have to answer to the same test.
+      - name: Leak assertions
+        run: VTT_BASE=http://127.0.0.1:8080 node scripts/smoke.mjs
+      - name: Export and restore
+        run: VTT_BASE=http://127.0.0.1:8080 node scripts/server-checks.mjs
+
   contracts:
     name: Frozen contracts
     runs-on: ubuntu-latest

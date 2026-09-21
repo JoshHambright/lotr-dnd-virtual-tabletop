@@ -1,0 +1,45 @@
+# Runs the table on this machine, reachable through a tunnel.
+#
+#   cp .env.example .env     # set TABLE_SECRET
+#   docker compose up -d
+#
+# The tunnel is optional: without a token the app is on localhost:8080 and
+# nothing outside the house can reach it, which is the right default.
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 8080
+      DATA_DIR: /data
+    ports:
+      # Bound to loopback on purpose. Public reach is the tunnel's job, not
+      # the router's — see docs/OPERATIONS.md.
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ['tunnel']
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      app:
+        condition: service_healthy
