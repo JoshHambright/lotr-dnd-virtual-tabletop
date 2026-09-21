@@ -253,6 +253,7 @@ describe('what a player may do', () => {
       { t: 'scene.setActive', id: 'staged' },
       { t: 'scene.delete', id: 'live' },
       { t: 'fog.setAll', sceneId: 'live', revealed: true },
+      { t: 'fog.resize', sceneId: 'live', cell: 64 },
       { t: 'fog.paint', sceneId: 'live', shape: { kind: 'circle', x: 0, y: 0, radius: 9999 }, reveal: true },
       { t: 'statblock.upsert', statBlock: newStatBlock('sb9', 'Balrog') },
       { t: 'statblock.delete', id: 'sb-spy' },

@@ -48,6 +48,22 @@ describe('fog', () => {
     expect(isRevealed(state.scenes['s1']!.fog.mask, 600, 600)).toBe(true)
   })
 
+  it('re-cuts the mask at a new resolution, keeping what was uncovered', () => {
+    let state = roomWithScene()
+    state = reduce(state, { t: 'fog.paint', sceneId: 's1', shape: { kind: 'rect', x: 0, y: 0, width: 200, height: 200 }, reveal: true })
+    state = reduce(state, { t: 'fog.resize', sceneId: 's1', cell: 16 })
+    expect(state.scenes['s1']?.fog.mask.cell).toBe(16)
+    expect(isRevealed(state.scenes['s1']!.fog.mask, 100, 100)).toBe(true)
+    expect(isRevealed(state.scenes['s1']!.fog.mask, 500, 500)).toBe(false)
+  })
+
+  it('refuses to let a scene patch overwrite the mask', () => {
+    let state = roomWithScene()
+    state = reduce(state, { t: 'fog.setAll', sceneId: 's1', revealed: true })
+    state = reduce(state, { t: 'scene.update', id: 's1', patch: { fog: { enabled: false, mask: { cell: 32, cols: 1, rows: 1, runs: [1] } } } as never })
+    expect(isRevealed(state.scenes['s1']!.fog.mask, 100, 100)).toBe(true)
+  })
+
   it('toggles fog on without disturbing the mask', () => {
     let state = roomWithScene()
     state = reduce(state, { t: 'fog.paint', sceneId: 's1', shape: { kind: 'circle', x: 100, y: 100, radius: 50 }, reveal: true })

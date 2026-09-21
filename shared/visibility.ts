@@ -115,6 +115,7 @@ export function projectOpForPlayer(op: Op, before: RoomState, after: RoomState):
     case 'fog.paint':
     case 'fog.setAll':
     case 'fog.enable':
+    case 'fog.resize':
       return op.sceneId === after.activeSceneId ? [op] : []
 
     case 'token.create':

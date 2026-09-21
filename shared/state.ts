@@ -9,7 +9,7 @@
  */
 
 import type { FogMask, FogShape } from './fog.js'
-import { createMask, paint, setAll } from './fog.js'
+import { createMask, paint, resize, setAll } from './fog.js'
 import type { RollMode, RollResult } from './dice.js'
 
 export type Role = 'gm' | 'player'
@@ -214,6 +214,7 @@ export type Op =
   | { t: 'fog.paint'; sceneId: string; shape: FogShape; reveal: boolean }
   | { t: 'fog.setAll'; sceneId: string; revealed: boolean }
   | { t: 'fog.enable'; sceneId: string; enabled: boolean }
+  | { t: 'fog.resize'; sceneId: string; cell: number }
   | { t: 'token.create'; token: Token }
   | { t: 'token.move'; id: string; x: number; y: number }
   | { t: 'token.update'; id: string; patch: Partial<Omit<Token, 'id' | 'sceneId'>> }
@@ -282,6 +283,16 @@ export function reduce(state: RoomState, op: Op): RoomState {
       const scene = state.scenes[op.sceneId]
       if (!scene) return state
       return withFog(state, scene, { ...scene.fog, enabled: op.enabled })
+    }
+
+    case 'fog.resize': {
+      // Re-cut the mask at a new cell size, carrying over what is uncovered.
+      // A scene patch cannot do this: the reducer deliberately refuses to let
+      // a patch overwrite fog, so the mask can only change through fog ops.
+      const scene = state.scenes[op.sceneId]
+      if (!scene) return state
+      const mask = resize(scene.fog.mask, scene.width, scene.height, op.cell)
+      return withFog(state, scene, { ...scene.fog, mask })
     }
 
     case 'token.create':
