@@ -1,20 +1,40 @@
 /**
  * The dice everyone watches land.
  *
- * The numbers were decided on the server before this component ever saw them.
- * What happens here is theatre — but it is *shared* theatre: the tumble is
- * driven by a seed that came down with the roll, so the die that skitters left
- * on the GM's screen skitters left on everyone's, and lands on the same face.
+ * The numbers were decided on the server before this component saw them. What
+ * happens here is theatre — but it is *shared* theatre: the tumble is driven by
+ * a seed that came down with the roll, so the die that skitters left on the
+ * GM's screen skitters left on everyone's, and lands on the same face.
+ *
+ * They are real solids (see `dice3d.ts`), tumbled as orientations and eased
+ * into showing the face the server chose. A physics engine would be the wrong
+ * tool: the result is already known, so the die has to *land* on a given face,
+ * and easing an orientation is honest about that in a way a rigged simulation
+ * would not be.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Roll } from '@vtt/core'
-import { RollDetail } from './RollDetail.js'
 import { criticalKind } from '@vtt/dice'
+import { RollDetail } from './RollDetail.js'
+import type { Quat, Solid, Vec3 } from '../dice3d.js'
+import {
+  faceCentroid,
+  faceNormal,
+  orientationShowing,
+  quatFromAxisAngle,
+  quatMultiply,
+  quatSlerp,
+  rotate,
+  solidFor,
+} from '../dice3d.js'
 
-const TUMBLE_MS = 900
-const SETTLE_MS = 350
+const TUMBLE_MS = 820
+const SETTLE_MS = 420
 const HOLD_MS = 4200
+
+/** Struck from above and to the left, so facets separate without a spotlight. */
+const LIGHT: Vec3 = [-0.42, -0.72, 0.55]
 
 interface Props {
   roll: Roll | null
@@ -26,10 +46,17 @@ interface Die {
   sides: number
   value: number
   kept: boolean
-  startX: number
-  startY: number
+  solid: Solid
+  /** Which face carries the rolled number. */
+  faceIndex: number
+  /** Where it enters from, and how it spins on the way in. */
+  fromX: number
+  fromY: number
+  axis: Vec3
   spin: number
-  wobble: number
+  start: Quat
+  target: Quat
+  delay: number
 }
 
 export function DiceTray({ roll, nonce }: Props) {
@@ -45,14 +72,6 @@ export function DiceTray({ roll, nonce }: Props) {
   }
 
   const visible = Boolean(roll) && dismissedNonce !== nonce
-
-  useEffect(() => {
-    if (!roll || !visible) return
-    // Setting state from a timer is asynchronous, so it does not cascade.
-    const timer = setTimeout(() => setDismissedNonce(nonce), TUMBLE_MS + SETTLE_MS + HOLD_MS)
-    return () => clearTimeout(timer)
-  }, [roll, nonce, visible])
-
   const dice = useMemo(() => (roll ? layOutDice(roll) : []), [roll])
 
   useEffect(() => {
@@ -61,52 +80,83 @@ export function DiceTray({ roll, nonce }: Props) {
     const context = canvas.getContext('2d')
     if (!context) return
 
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     const started = performance.now()
     let frame = 0
+    let settledFrames = 0
 
     const draw = () => {
-      frame = requestAnimationFrame(draw)
-      const elapsed = performance.now() - started
+      const elapsed = reduced ? TUMBLE_MS + SETTLE_MS : performance.now() - started
 
       const ratio = window.devicePixelRatio || 1
       const width = canvas.clientWidth
       const height = canvas.clientHeight
-      if (canvas.width !== Math.round(width * ratio)) {
+      if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
         canvas.width = Math.round(width * ratio)
         canvas.height = Math.round(height * ratio)
       }
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
       context.clearRect(0, 0, width, height)
 
-      const columns = Math.min(dice.length, Math.max(1, Math.floor(width / 54)))
-      const size = Math.min(44, (width - 16) / columns - 8)
+      const { columns, rows, cell } = layoutDice(dice.length, width)
+      const radius = cell * 0.4
+
+      const needed = `${Math.max(58, rows * cell + PAD)}px`
+      if (canvas.style.height !== needed) {
+        canvas.style.height = needed
+        // The element just changed size; next frame measures it correctly.
+        frame = requestAnimationFrame(draw)
+        return
+      }
+
+      let allSettled = true
 
       dice.forEach((die, index) => {
         const column = index % columns
         const row = Math.floor(index / columns)
-        const restX = 12 + size / 2 + column * (size + 8)
-        const restY = 12 + size / 2 + row * (size + 8)
+        const restX = PAD / 2 + cell / 2 + column * cell
+        const restY = PAD / 2 + cell / 2 + row * cell
 
-        // Ease from the die's seeded entry point to its place in the row.
-        const t = Math.min(1, elapsed / TUMBLE_MS)
-        const eased = 1 - Math.pow(1 - t, 3)
-        const x = die.startX * width * (1 - eased) + restX * eased
-        const y = die.startY * height * (1 - eased) + restY * eased
+        const local = elapsed - die.delay
+        const tumbleT = Math.max(0, Math.min(1, local / TUMBLE_MS))
+        const settleT = Math.max(0, Math.min(1, (local - TUMBLE_MS) / SETTLE_MS))
+        if (settleT < 1) allSettled = false
 
-        // A short overshoot as it hits the felt, then still.
-        const settle = Math.max(0, Math.min(1, (elapsed - TUMBLE_MS) / SETTLE_MS))
-        const bounce = settle < 1 ? Math.sin(settle * Math.PI * 2) * (1 - settle) * size * 0.12 : 0
+        // Fly in from off-tray, decelerating.
+        const eased = 1 - Math.pow(1 - tumbleT, 3)
+        const x = die.fromX * width * (1 - eased) + restX * eased
+        const y = die.fromY * height * (1 - eased) + restY * eased
+        const bounce = settleT > 0 && settleT < 1 ? Math.sin(settleT * Math.PI) * (1 - settleT) * radius * 0.35 : 0
 
-        const angle = t < 1 ? die.spin * (1 - eased) * 8 : die.wobble * (1 - settle) * 0.4
-        const face = t < 1 ? faceDuring(die, elapsed) : die.value
+        let orientation: Quat
+        if (settleT <= 0) {
+          orientation = quatMultiply(quatFromAxisAngle(die.axis, die.spin * local * 0.006), die.start)
+        } else {
+          const spun = quatMultiply(quatFromAxisAngle(die.axis, die.spin * TUMBLE_MS * 0.006), die.start)
+          orientation = quatSlerp(spun, die.target, easeOutBack(settleT))
+        }
 
-        drawDie(context, x, y - bounce, size, angle, die.sides, face, die.kept, t >= 1)
+        drawDie(context, die, orientation, x, y - bounce, radius, settleT >= 1)
       })
+
+      // Once every die is still there is nothing left to animate, so stop
+      // asking for frames rather than spinning on a static picture.
+      if (allSettled) {
+        settledFrames++
+        if (settledFrames > 2) return
+      }
+      frame = requestAnimationFrame(draw)
     }
 
     frame = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(frame)
   }, [dice, roll, visible, nonce])
+
+  useEffect(() => {
+    if (!roll || !visible) return
+    const timer = setTimeout(() => setDismissedNonce(nonce), TUMBLE_MS + SETTLE_MS + HOLD_MS)
+    return () => clearTimeout(timer)
+  }, [roll, nonce, visible])
 
   if (!roll || !visible) return null
 
@@ -114,139 +164,199 @@ export function DiceTray({ roll, nonce }: Props) {
 
   return (
     <div
-      className={`dice-tray${roll.visibility === 'gm' ? ' dice-tray--private' : ''}`}
+      className={`tray${roll.visibility === 'gm' ? ' tray--private' : ''}`}
       onClick={() => setDismissedNonce(nonce)}
+      role="status"
     >
-      <div className="dice-tray__header">
-        <strong>{roll.by}</strong>
-        {roll.label ? <span className="dice-tray__label">{roll.label}</span> : null}
-        {roll.visibility === 'gm' ? <span className="dice-tray__badge">behind the screen</span> : null}
+      <div className="tray__head">
+        <span className="tray__who">{roll.by}</span>
+        {roll.label ? <span className="tray__label">{roll.label}</span> : null}
+        {roll.visibility === 'gm' ? <span className="tray__private">behind the screen</span> : null}
       </div>
-      <canvas ref={canvasRef} className="dice-tray__canvas" style={{ height: trayHeight(dice.length) }} />
-      <div className="dice-tray__detail">
-        <RollDetail result={roll.result} />
+
+      <canvas ref={canvasRef} className="tray__canvas" style={{ height: trayHeight(dice.length) }} />
+
+      <div className="tray__foot">
+        <span className="tray__detail">
+          <RollDetail result={roll.result} />
+        </span>
+        <span className={`tray__total${critical ? ` tray__total--${critical}` : ''}`}>{roll.result.total}</span>
       </div>
-      <div className={`dice-tray__total${critical ? ` dice-tray__total--${critical}` : ''}`}>{roll.result.total}</div>
     </div>
   )
 }
 
-/** Four dice to a row at the tray's width; enough height for the rows needed. */
+const TRAY_INNER_WIDTH = 220
+const MAX_TRAY_HEIGHT = 208
+const PAD = 12
+
+/**
+ * Fits the dice in the tray rather than letting them run off the bottom.
+ * A handful of d6 stays large; rolling a fistful shrinks them until the whole
+ * throw is visible, because a die you cannot see is not evidence of anything.
+ */
+function layoutDice(count: number, width: number): { columns: number; rows: number; cell: number } {
+  const n = Math.max(1, count)
+  // A few dice get to be large; a fistful shrinks to fit.
+  let cell = Math.max(34, Math.min(64, Math.floor((width - PAD) / Math.min(n, 4))))
+  const columnsFor = (c: number) => Math.max(1, Math.min(n, Math.floor((width - PAD) / c)))
+
+  let columns = columnsFor(cell)
+  let rows = Math.ceil(n / columns)
+  while (rows * cell + PAD > MAX_TRAY_HEIGHT && cell > 20) {
+    cell -= 3
+    columns = columnsFor(cell)
+    rows = Math.ceil(n / columns)
+  }
+  return { columns, rows, cell }
+}
+
 function trayHeight(count: number): number {
-  return Math.min(168, Math.max(56, Math.ceil(Math.max(1, count) / 4) * 52 + 8))
+  const { rows, cell } = layoutDice(count, TRAY_INNER_WIDTH)
+  return Math.max(58, rows * cell + PAD)
 }
 
 /**
- * Expands a result into individual dice, seeding each one's entry point from
- * the roll's seed so every client animates the same throw.
+ * Expands a result into individual dice, seeding each one from the roll's seed
+ * so every client animates the same throw.
  */
 function layOutDice(roll: Roll): Die[] {
   const random = mulberry32(roll.seed)
   const dice: Die[] = []
+
   for (const term of roll.result.terms) {
     if (term.kind !== 'dice') continue
     for (const die of term.rolls) {
+      const solid = solidFor(term.sides)
+      // Faces carry 1..n in order; which face is which only has to be stable.
+      const faceIndex = (die.value - 1) % solid.faces.length
+      const axis: Vec3 = [random() * 2 - 1, random() * 2 - 1, random() * 2 - 1]
+
       dice.push({
         sides: term.sides,
         value: die.value,
         kept: die.kept,
-        // Enter from off the left or right edge, above the tray.
-        startX: random() < 0.5 ? -0.4 - random() * 0.3 : 1.4 + random() * 0.3,
-        startY: -0.6 - random() * 0.5,
-        spin: (random() - 0.5) * 4,
-        wobble: (random() - 0.5) * 2,
+        solid,
+        faceIndex,
+        fromX: random() < 0.5 ? -0.45 - random() * 0.35 : 1.45 + random() * 0.35,
+        fromY: -0.7 - random() * 0.6,
+        axis: axis[0] === 0 && axis[1] === 0 && axis[2] === 0 ? [1, 0.3, 0.2] : axis,
+        spin: 2.2 + random() * 2.6,
+        start: quatFromAxisAngle([random() * 2 - 1, random() * 2 - 1, random() * 2 - 1], random() * Math.PI * 2),
+        target: orientationShowing(faceNormal(solid, solid.faces[faceIndex]!), random() * Math.PI * 2),
+        // A stagger, so a handful of dice lands like a handful rather than a block.
+        delay: random() * 130,
       })
     }
   }
-  return dice.slice(0, 40)
-}
 
-/** A face that flickers while the die is in the air. */
-function faceDuring(die: Die, elapsed: number): number {
-  const random = mulberry32(Math.floor(elapsed / 70) * 9176 + die.sides * 31 + Math.floor(die.startX * 1000))
-  return Math.floor(random() * die.sides) + 1
+  return dice.slice(0, 40)
 }
 
 function drawDie(
   context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  angle: number,
-  sides: number,
-  face: number,
-  kept: boolean,
+  die: Die,
+  orientation: Quat,
+  cx: number,
+  cy: number,
+  radius: number,
   settled: boolean,
 ): void {
+  const { solid } = die
+  const scale = radius / 1.5
+
+  const projected = solid.vertices.map((v) => {
+    const r = rotate(v, orientation)
+    return { x: cx + r[0] * scale, y: cy - r[1] * scale, z: r[2] }
+  })
+
+  // Visible faces only, painted back to front so shared edges meet cleanly.
+  const visible = solid.faces
+    .map((face, index) => {
+      const normal = rotate(faceNormal(solid, face), orientation)
+      const centroid = rotate(faceCentroid(solid, face), orientation)
+      return { face, index, normal, depth: centroid[2] }
+    })
+    .filter((f) => f.normal[2] > 0.001)
+    .sort((a, b) => a.depth - b.depth)
+
   context.save()
-  context.translate(x, y)
-  context.rotate(angle)
-  // A dropped die still has to be readable — it is evidence that advantage
-  // was taken, and a blank disc with a line through it proves nothing.
-  context.globalAlpha = kept ? 1 : 0.62
+  context.globalAlpha = die.kept ? 1 : 0.5
 
-  const radius = size / 2
-  tracePolygon(context, radius, cornersFor(sides))
+  // A real die shows one number. Painting every face that happens to be
+  // turned this way gave a d20 reading "18 17 13" at once, which is clutter,
+  // not a die — so only the face most squarely facing the viewer is numbered.
+  const front = visible.reduce<(typeof visible)[number] | null>(
+    (best, f) => (best === null || f.normal[2] > best.normal[2] ? f : best),
+    null,
+  )
 
-  const gradient = context.createLinearGradient(-radius, -radius, radius, radius)
-  gradient.addColorStop(0, kept ? '#3c3529' : '#2a2620')
-  gradient.addColorStop(1, kept ? '#241f18' : '#1d1a15')
-  context.fillStyle = gradient
-  context.fill()
-
-  context.lineWidth = Math.max(1, size * 0.045)
-  context.strokeStyle = settled && kept ? '#e8c87a' : 'rgba(232, 200, 122, 0.4)'
-  context.stroke()
-
-  context.rotate(-angle)
-  context.fillStyle = kept ? '#f4e9d4' : '#c4b79f'
-  context.font = `600 ${size * 0.42}px ui-serif, Georgia, serif`
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  context.fillText(String(face), 0, size * 0.02)
-
-  // A struck-through die is one advantage or a keep-highest discarded.
-  if (!kept && settled) {
-    context.strokeStyle = '#b04a3f'
-    context.lineWidth = Math.max(1, size * 0.06)
+  for (const { face, index, normal } of visible) {
     context.beginPath()
-    context.moveTo(-radius * 0.6, radius * 0.6)
-    context.lineTo(radius * 0.6, -radius * 0.6)
+    face.forEach((vertexIndex, i) => {
+      const p = projected[vertexIndex]!
+      if (i === 0) context.moveTo(p.x, p.y)
+      else context.lineTo(p.x, p.y)
+    })
+    context.closePath()
+
+    const lit = Math.max(0, normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2])
+    context.fillStyle = shade(die.kept, lit)
+    context.fill()
+
+    context.lineWidth = Math.max(0.6, radius * 0.035)
+    context.strokeStyle = die.kept ? 'rgba(12, 14, 20, 0.85)' : 'rgba(12, 14, 20, 0.5)'
+    context.stroke()
+
+    if (front && index === front.index) {
+      const centre = rotate(faceCentroid(solid, face), orientation)
+      const size = radius * (die.sides >= 20 ? 0.52 : die.sides >= 12 ? 0.58 : 0.7)
+      context.save()
+      context.globalAlpha = die.kept ? 1 : 0.5
+      context.fillStyle = die.kept ? '#f4f6f8' : '#aab3bd'
+      context.font = `650 ${size}px ui-sans-serif, system-ui, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      // Once settled the front face *is* the rolled one, because that is the
+      // orientation the die was eased into.
+      const shown = settled ? die.value : index + 1
+      context.fillText(String(shown), cx + centre[0] * scale, cy - centre[1] * scale + size * 0.06)
+      context.restore()
+    }
+    void normal
+  }
+
+  // A dropped die is struck through once it has stopped, so the log and the
+  // tray agree about which dice counted.
+  if (!die.kept && settled) {
+    context.globalAlpha = 1
+    context.strokeStyle = '#c2564a'
+    context.lineWidth = Math.max(1.2, radius * 0.12)
+    context.beginPath()
+    context.moveTo(cx - radius * 0.72, cy + radius * 0.72)
+    context.lineTo(cx + radius * 0.72, cy - radius * 0.72)
     context.stroke()
   }
 
   context.restore()
 }
 
-/** Enough of a silhouette to read the die type at a glance. */
-function cornersFor(sides: number): number {
-  switch (sides) {
-    case 4:
-      return 3
-    case 6:
-      return 4
-    case 8:
-      return 4
-    case 10:
-    case 100:
-      return 5
-    case 12:
-      return 5
-    default:
-      return 6
-  }
+/** Cool slate faces so the lit edges read; a dropped die desaturates. */
+function shade(kept: boolean, lit: number): string {
+  // A wider range than looks right on paper: on a small die the facets have
+  // only a few pixels each, so gentle shading reads as one flat blob.
+  const curved = Math.pow(lit, 0.72)
+  const base = kept ? 38 : 32
+  const range = kept ? 132 : 58
+  const value = Math.round(base + curved * range)
+  return `rgb(${value}, ${Math.round(value * 1.04)}, ${Math.round(value * 1.16)})`
 }
 
-function tracePolygon(context: CanvasRenderingContext2D, radius: number, corners: number): void {
-  context.beginPath()
-  for (let i = 0; i < corners; i++) {
-    const angle = (i / corners) * Math.PI * 2 - Math.PI / 2
-    const x = Math.cos(angle) * radius
-    const y = Math.sin(angle) * radius
-    if (i === 0) context.moveTo(x, y)
-    else context.lineTo(x, y)
-  }
-  context.closePath()
+/** Overshoots a little on landing, the way a die rocks before it settles. */
+function easeOutBack(t: number): number {
+  const c1 = 1.2
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
 
 /** Small, fast, seedable PRNG — identical output for identical seeds. */

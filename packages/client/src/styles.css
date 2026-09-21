@@ -5,20 +5,42 @@
  */
 
 :root {
-  --ink: #f2e7d2;
-  --ink-soft: #b8a88c;
-  --ink-faint: #7d7059;
-  --vellum: #14100c;
-  --vellum-raised: #1e1812;
-  --vellum-high: #272017;
-  --rule: #38301f;
-  --gold: #e8c87a;
-  --gold-dim: #a98c4a;
-  --blood: #b04a3f;
-  --leaf: #5b9c52;
-  --radius: 8px;
+  /* The chrome is an instrument; colour belongs to the table.
+     Everything structural is a cool graphite so that token colours, dice and
+     map art are the only saturated things on screen — which is what a tool
+     used for three hours next to a video call actually needs.
+
+     A ruleset pack overrides these, which is how the app reskins itself
+     without a single conditional in a component. */
+
+  --ground: #0e1116;
+  --surface: #151a20;
+  --raised: #1c232b;
+  --sunken: #0a0d11;
+  --line: #29323c;
+  --line-soft: #1e252e;
+
+  --ink: #e7eaee;
+  --ink-soft: #97a2ae;
+  --ink-faint: #667381;
+
+  /* One accent, used only for interactive state and selection. */
+  --accent: #6f9bd1;
+  --accent-dim: #4a6f9e;
+  --accent-ink: #0b1017;
+
+  /* Semantic, deliberately separate from the accent. */
+  --good: #6f9f6a;
+  --warn: #c9a227;
+  --bad: #c2564a;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --serif: ui-serif, Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
-  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
+
   color-scheme: dark;
 }
 
@@ -34,7 +56,8 @@ body,
 }
 
 body {
-  background: var(--vellum);
+  background: var(--ground);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
   font-family: var(--sans);
   font-size: 14px;
@@ -68,8 +91,8 @@ h3 {
 .chip {
   font: inherit;
   color: var(--ink);
-  background: var(--vellum-high);
-  border: 1px solid var(--rule);
+  background: var(--raised);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.45em 0.8em;
   cursor: pointer;
@@ -80,8 +103,8 @@ h3 {
 
 .button:hover:not(:disabled),
 .chip:hover:not(:disabled) {
-  background: #322818;
-  border-color: var(--gold-dim);
+  background: var(--raised);
+  border-color: var(--accent-dim);
 }
 
 .button:disabled,
@@ -91,22 +114,22 @@ h3 {
 }
 
 .button--primary {
-  background: var(--gold-dim);
-  border-color: var(--gold);
-  color: #1b1510;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
 .button--primary:hover:not(:disabled) {
-  background: var(--gold);
+  filter: brightness(1.08);
 }
 
 .button--danger {
-  border-color: #5c2f2a;
-  color: #e6a79f;
+  border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
+  color: var(--bad);
 }
 .button--danger:hover:not(:disabled) {
-  background: #3a201c;
+  background: color-mix(in srgb, var(--bad) 22%, var(--surface));
 }
 
 .button--small,
@@ -116,9 +139,9 @@ h3 {
 }
 
 .chip--on {
-  background: var(--gold-dim);
-  border-color: var(--gold);
-  color: #1b1510;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -136,8 +159,8 @@ h3 {
   font: inherit;
   width: 100%;
   color: var(--ink);
-  background: #100d09;
-  border: 1px solid var(--rule);
+  background: var(--sunken);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.45em 0.6em;
 }
@@ -145,7 +168,7 @@ h3 {
 .input:focus-visible,
 .button:focus-visible,
 .chip:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -194,7 +217,7 @@ h3 {
 }
 
 .fieldset {
-  border: 1px solid var(--rule);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.7em;
   margin: 0.7em 0;
@@ -217,9 +240,9 @@ h3 {
 }
 
 .error {
-  color: #e6a79f;
-  background: #2c1815;
-  border: 1px solid #5c2f2a;
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line));
   border-radius: var(--radius);
   padding: 0.5em 0.7em;
   margin: 0.5em 0;
@@ -231,8 +254,8 @@ h3 {
   font-size: 0.7em;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--gold);
-  border: 1px solid var(--gold-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
   border-radius: 999px;
   padding: 0.1em 0.5em;
   margin-left: 0.5em;
@@ -256,7 +279,7 @@ h3 {
   cursor: pointer;
 }
 .swatch--on {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 /* --- Join ---------------------------------------------------------------- */
@@ -266,13 +289,13 @@ h3 {
   display: grid;
   place-items: center;
   padding: 24px 16px;
-  background: radial-gradient(ellipse at 50% 0%, #241c13 0%, var(--vellum) 60%);
+  background: radial-gradient(ellipse at 50% 0%, #241c13 0%, var(--ground) 60%);
 }
 
 .join__card {
   width: min(100%, 460px);
-  background: var(--vellum-raised);
-  border: 1px solid var(--rule);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 26px;
   display: grid;
@@ -286,7 +309,7 @@ h3 {
 }
 
 .join__section {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--line);
   padding-top: 14px;
   display: grid;
   gap: 8px;
@@ -316,8 +339,8 @@ h3 {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--vellum-raised);
-  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 
 .table__identity,
@@ -335,9 +358,9 @@ h3 {
 .code {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.2em;
-  background: #100d09;
-  border: 1px dashed var(--gold-dim);
-  color: var(--gold);
+  background: var(--sunken);
+  border: 1px dashed var(--accent-dim);
+  color: var(--accent);
   border-radius: var(--radius);
   padding: 0.2em 0.55em;
   cursor: copy;
@@ -348,25 +371,25 @@ h3 {
   color: var(--ink-faint);
 }
 .status--open {
-  color: var(--leaf);
+  color: var(--good);
 }
 .status--reconnecting {
-  color: var(--gold);
+  color: var(--accent);
 }
 .status--closed {
-  color: var(--blood);
+  color: var(--bad);
 }
 
 .person {
   font-size: 0.82em;
   color: var(--ink-soft);
-  border: 1px solid var(--rule);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.15em 0.6em;
 }
 .person--gm {
-  border-color: var(--gold-dim);
-  color: var(--gold);
+  border-color: var(--accent-dim);
+  color: var(--accent);
 }
 
 .notice {
@@ -374,8 +397,8 @@ h3 {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  background: #2a2214;
-  border-bottom: 1px solid var(--gold-dim);
+  background: var(--raised);
+  border-bottom: 1px solid var(--accent-dim);
   color: var(--ink-soft);
   padding: 6px 12px;
   font-size: 0.88em;
@@ -391,7 +414,7 @@ h3 {
 .table__map {
   position: relative;
   min-width: 0;
-  background: var(--vellum);
+  background: var(--ground);
 }
 
 .map-canvas {
@@ -403,8 +426,8 @@ h3 {
 
 .table__side {
   min-width: 0;
-  border-left: 1px solid var(--rule);
-  background: var(--vellum-raised);
+  border-left: 1px solid var(--line);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -412,7 +435,7 @@ h3 {
 
 .table__side > .tabs {
   padding: 8px;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--line);
 }
 
 .table__panels {
@@ -431,7 +454,7 @@ h3 {
 }
 
 .panel--settings {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--line);
   padding: 10px;
 }
 
@@ -440,9 +463,9 @@ h3 {
   left: 50%;
   bottom: 18px;
   transform: translateX(-50%);
-  background: #2c1815;
-  border: 1px solid #5c2f2a;
-  color: #e6a79f;
+  background: color-mix(in srgb, var(--bad) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line));
+  color: var(--bad);
   padding: 0.5em 0.9em;
   border-radius: var(--radius);
   font-size: 0.9em;
@@ -468,8 +491,8 @@ h3 {
 }
 
 .scene-list__item--editing {
-  border-color: var(--gold-dim);
-  background: #221b12;
+  border-color: var(--accent-dim);
+  background: var(--raised);
 }
 
 .scene-list__name {
@@ -487,11 +510,11 @@ h3 {
 }
 
 .scene-list__name:hover {
-  background: var(--vellum-high);
+  background: var(--raised);
 }
 
 .scene-editor {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--line);
   padding-top: 10px;
   display: grid;
   gap: 8px;
@@ -523,16 +546,16 @@ h3 {
 }
 
 .roll-log__entry {
-  border: 1px solid var(--rule);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 6px 8px;
-  background: #171209;
+  background: var(--sunken);
 }
 
 .roll-log__entry--private,
 .chat-log__entry--private {
   border-style: dashed;
-  border-color: var(--gold-dim);
+  border-color: var(--accent-dim);
 }
 
 .roll-log__head {
@@ -577,11 +600,11 @@ h3 {
 
 .roll-log__total--success,
 .dice-tray__total--success {
-  color: var(--leaf);
+  color: var(--good);
 }
 .roll-log__total--failure,
 .dice-tray__total--failure {
-  color: var(--blood);
+  color: var(--bad);
 }
 
 .roll-log__empty {
@@ -597,7 +620,7 @@ h3 {
   font-size: 0.92em;
 }
 .chat-log strong {
-  color: var(--gold-dim);
+  color: var(--accent-dim);
 }
 
 .chat-panel__form {
@@ -607,68 +630,105 @@ h3 {
 
 /* --- The tray ------------------------------------------------------------ */
 
-.dice-tray {
+/* Dice land on a dark slab that sits over the map rather than beside it, so
+   the table does not reflow when someone rolls. */
+.tray {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
-  width: 230px;
-  background: rgba(20, 16, 12, 0.94);
-  border: 1px solid var(--gold-dim);
-  border-radius: 12px;
-  padding: 10px;
+  right: 14px;
+  bottom: 14px;
+  width: 244px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  background: color-mix(in srgb, var(--sunken) 92%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 4%) inset,
+    0 18px 40px -18px rgb(0 0 0 / 80%);
+  backdrop-filter: blur(8px);
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  animation: tray-in 220ms ease-out;
+  animation: tray-in 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 @keyframes tray-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px) scale(0.98);
   }
 }
 
-.dice-tray--private {
+@media (prefers-reduced-motion: reduce) {
+  .tray {
+    animation: none;
+  }
+}
+
+.tray--private {
+  border-color: var(--accent-dim);
   border-style: dashed;
 }
 
-.dice-tray__header {
+.tray__head {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: baseline;
+  gap: 7px;
   flex-wrap: wrap;
-  font-size: 0.82em;
+  font-size: 0.78rem;
+}
+
+.tray__who {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tray__label {
   color: var(--ink-faint);
 }
 
-.dice-tray__label {
-  font-style: italic;
-  color: var(--ink-soft);
+.tray__private {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
 }
 
-.dice-tray__badge {
-  font-size: 0.85em;
-  color: var(--gold);
-}
-
-.dice-tray__canvas {
+.tray__canvas {
   width: 100%;
   display: block;
 }
 
-.dice-tray__detail {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 0.75em;
-  color: var(--ink-faint);
-  word-break: break-word;
+.tray__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 7px;
 }
 
-.dice-tray__total {
-  font-family: var(--serif);
-  font-size: 2.1rem;
-  font-weight: 700;
-  text-align: right;
-  line-height: 1;
+.tray__detail {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.tray__total {
+  font-size: 2rem;
+  font-weight: 650;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.tray__total--success {
+  color: var(--good);
+}
+
+.tray__total--failure {
+  color: var(--bad);
 }
 
 /* --- Sheets -------------------------------------------------------------- */
@@ -698,7 +758,7 @@ h3 {
 }
 
 .sheet__section {
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--line);
   padding-top: 10px;
 }
 
@@ -718,10 +778,10 @@ h3 {
   display: grid;
   justify-items: center;
   gap: 2px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 6px 4px;
-  background: #171209;
+  background: var(--sunken);
 }
 
 .ability label {
@@ -745,17 +805,17 @@ h3 {
   font: inherit;
   font-family: var(--serif);
   font-weight: 700;
-  color: var(--gold);
-  background: #241d12;
-  border: 1px solid var(--gold-dim);
+  color: var(--accent);
+  background: var(--raised);
+  border: 1px solid var(--accent-dim);
   border-radius: 999px;
   padding: 0.05em 0.7em;
   cursor: pointer;
 }
 
 .ability__mod:hover {
-  background: var(--gold-dim);
-  color: #1b1510;
+  background: var(--accent-dim);
+  color: var(--accent-ink);
 }
 
 .sheet__conditions {
@@ -783,7 +843,7 @@ h3 {
   font: inherit;
   background: none;
   border: 0;
-  color: var(--gold);
+  color: var(--accent);
   cursor: pointer;
   width: 1.6em;
 }
@@ -806,22 +866,22 @@ h3 {
   min-width: 3em;
   text-align: center;
   color: var(--ink);
-  background: var(--vellum-high);
-  border: 1px solid var(--rule);
+  background: var(--raised);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   cursor: pointer;
 }
 
 .skill__mod:hover {
-  border-color: var(--gold-dim);
-  color: var(--gold);
+  border-color: var(--accent-dim);
+  color: var(--accent);
 }
 
 .token-inspector {
-  border: 1px solid var(--gold-dim);
+  border: 1px solid var(--accent-dim);
   border-radius: var(--radius);
   padding: 10px;
-  background: #1d1710;
+  background: var(--raised);
 }
 
 /* --- Narrow screens ------------------------------------------------------ */
@@ -834,7 +894,7 @@ h3 {
 
   .table__side {
     border-left: 0;
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
   .dice-tray {
@@ -850,10 +910,61 @@ h3 {
 
 .roll-detail__dropped {
   color: var(--ink-faint);
-  text-decoration-color: var(--blood);
+  text-decoration-color: var(--bad);
 }
 
 .roll-detail__max {
-  color: var(--gold);
+  color: var(--accent);
   font-weight: 700;
+}
+
+/* --- The map stage -------------------------------------------------------- */
+
+.map-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.map-canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Sits over the map rather than stealing space from it. */
+.map-hud {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(20, 16, 12, 0.82);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
+  font-size: 0.8em;
+}
+
+.map-hud__zoom {
+  min-width: 3.4em;
+  text-align: center;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.map-hud__button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.15em 0.55em;
+  cursor: pointer;
+}
+
+.map-hud__button:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
 }
