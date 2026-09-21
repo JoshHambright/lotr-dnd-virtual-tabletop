@@ -172,3 +172,43 @@ fixed.
 Six agents working against a moving contract invalidate each other's work. The
 contracts, not the agents, are what make parallelism safe. During a phase,
 contracts are append-only.
+
+---
+
+## D-013 — pnpm workspaces, not npm
+
+**Decided.** The monorepo uses pnpm.
+
+npm workspaces hoist everything into one `node_modules`, so a package can
+import a dependency it never declared and nothing complains until the day that
+dependency moves. pnpm does not hoist: a package sees only what it declares.
+
+In a repo where several workstreams run in parallel, a phantom dependency is a
+cross-workstream coupling nobody chose and nobody can see. The strictness is the
+point.
+
+**Cost accepted:** CI needs `pnpm/action-setup`, and `npm ci` no longer works.
+
+---
+
+## D-014 — Validate at the edge, then trust the types
+
+**Decided.** Every frame off the wire is parsed by a zod schema before it
+reaches the reducer.
+
+The prototype cast incoming JSON straight to `ClientMessage`. Permissions were
+checked, shapes were not — so a client could send `{ t: 'token.move', x: 'over
+there' }` and put a string where the reducer expected a number, or a `NaN` that
+propagates silently through the canvas.
+
+Authorization answers "may you do this". Validation answers "is this even a
+thing". Both have to be asked, and they are separate questions.
+
+Two consequences worth stating:
+
+- The schema union deliberately **omits `roll.add` and `chat.add`**. Those are
+  minted by the server; accepting them from a client would let a player write
+  their own entry into the log that exists to keep everyone honest.
+- Validation lives at `@vtt/protocol/schemas`, not on the package root, so a
+  browser importing protocol types does not drag zod into the bundle. Keeping
+  them separate is worth 14 KB gzipped, which is how it was found.

@@ -1,0 +1,16 @@
+{
+  "name": "@vtt/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wire messages between a browser and a table server",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas.ts"
+  },
+  "dependencies": {
+    "@vtt/core": "workspace:*",
+    "@vtt/dice": "workspace:*",
+    "zod": "^3.24.1"
+  }
+}

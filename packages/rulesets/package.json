@@ -1,0 +1,13 @@
+{
+  "name": "@vtt/rulesets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ruleset pack format and the packs themselves",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vtt/formula": "workspace:*"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@vtt/formula",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Safe arithmetic evaluator for derived sheet values",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

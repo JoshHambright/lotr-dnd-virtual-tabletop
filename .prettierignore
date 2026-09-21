@@ -1,5 +1,5 @@
-dist/
+**/dist/
 coverage/
-node_modules/
-.wrangler/
-package-lock.json
+**/node_modules/
+**/.wrangler/
+pnpm-lock.yaml

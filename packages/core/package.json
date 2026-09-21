@@ -1,0 +1,13 @@
+{
+  "name": "@vtt/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Room state, operations, the reducer, role filtering and fog masks",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vtt/dice": "workspace:*"
+  }
+}

@@ -97,8 +97,11 @@ the contracts frozen here.
 - `schemaVersion` on room state plus a migration hook, before there is any data
   worth migrating
 
-Exit: CI green on an empty-feature branch; every contract file has a spec doc
-and a type; `pnpm verify` passes from a clean clone.
+**Delivered.** pnpm workspace with eight packages; 4,690 lines moved with
+history preserved and all tests still green. Contracts frozen: the wire
+protocol with zod validation, the pack format, the formula grammar with
+executable conformance vectors, and room schema versioning with a migration
+chain. 184 tests, up from 151. `pnpm verify` passes from a clean clone.
 
 ### Phase 1 — Parallel build _(six independent workstreams)_
 

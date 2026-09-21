@@ -5,10 +5,14 @@ on:
     branches: ['**']
   pull_request:
 
-# A newer push makes an in-flight run irrelevant.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # pnpm does not hoist, so a package can only import what it declares. That
+  # strictness is why the monorepo is safe for parallel workstreams.
+  PNPM_VERSION: 10.33.0
 
 jobs:
   quality:
@@ -16,28 +20,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
-
+        run: pnpm lint
       - name: Formatting
-        run: npm run format:check
-
+        run: pnpm format:check
       - name: Types
-        run: npm run typecheck
-
-      # Coverage thresholds live in vite.config.ts and are gated hardest on
-      # the core, where a gap is a gap at the table.
+        run: pnpm typecheck
       - name: Tests and coverage
-        run: npm run coverage
-
+        run: pnpm coverage
       - name: Build
-        run: npm run build
+        run: pnpm build
 
       - name: Upload coverage
         if: always()
@@ -52,32 +53,67 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
 
       # Plants marked secrets in staged scenes, hidden tokens, stat blocks and
-      # GM notes, then proves none of them reach a real player socket. Treated
-      # as a security test: it is never skipped and never made advisory.
+      # GM notes, then proves none reach a real player socket. Treated as a
+      # security test: never skipped, never made advisory.
       - name: Start the server
-        run: npx wrangler dev --port 8787 &
+        run: pnpm --filter @vtt/adapter-cloudflare exec wrangler dev --port 8787 &
       - name: Wait for it
-        run: npx wait-on http://127.0.0.1:8787 --timeout 90000
+        run: pnpm exec wait-on http://127.0.0.1:8787 --timeout 90000
       - name: Smoke test
         run: node scripts/smoke.mjs
+
+  contracts:
+    name: Frozen contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Phase 1 runs several workstreams in parallel against contracts frozen
+      # in Phase 0. Changing one mid-phase invalidates work already in flight,
+      # so a change here has to be a deliberate, reviewed act.
+      - name: Warn on contract changes
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- \
+            packages/protocol/src packages/rulesets/src/pack.ts packages/formula/src || true)
+          if [ -n "$CHANGED" ]; then
+            echo "::warning::This PR changes a frozen contract:"
+            echo "$CHANGED" | while read -r f; do echo "::warning::  $f"; done
+            echo "Confirm the 'breaking contract change' box in the PR template."
+          fi
 
   dependencies:
     name: Dependency audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Audit
-        run: npm audit --audit-level=high
+        run: pnpm audit --audit-level high

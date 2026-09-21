@@ -1,0 +1,20 @@
+{
+  "name": "@vtt/adapter-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runs a table on Cloudflare Workers + Durable Objects",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@vtt/core": "workspace:*",
+    "@vtt/dice": "workspace:*",
+    "@vtt/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0",
+    "@cloudflare/workers-types": "^5.0.0"
+  }
+}

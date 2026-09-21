@@ -1,9 +1,13 @@
-# Middle-earth Table
+# virtual-tabletop
 
-A small virtual tabletop for a Middle-earth game played over a call. Built for
-one group, on purpose: a shared map with fog of war, tokens everyone can move,
-dice everybody watches land, character sheets that stop drifting apart between
-sessions, and a bestiary only the GM can see.
+A self-hosted, ruleset-agnostic virtual tabletop for games played over a call:
+a shared map with fog of war, tokens everyone can move, dice everybody watches
+land, character sheets that stop drifting apart between sessions, and a
+bestiary only the GM can see.
+
+Targets **LotR 5e**, the **5e SRD**, and the **MÖRK BORG** family, with the app
+skinning itself to whichever is in play. Being built in phases —
+[docs/PLAN.md](docs/PLAN.md) is the plan, and Phase 0 is done.
 
 It replaces the parts of a shared Drive folder that were never really working —
 the static map screenshots, the three slightly different copies of a character
@@ -118,11 +122,11 @@ flipping, because their browser never held the token at all.
 ## Development
 
 ```bash
-npm run typecheck
-npm run test          # 89 unit tests: dice, fog, reducer, role filtering
-npm run build
-npm run dev           # then, in another shell:
-node scripts/smoke.mjs   # 43 end-to-end checks against the running Worker
+pnpm install
+pnpm verify              # what CI runs: lint, format, types, coverage, build
+pnpm test                # 184 unit tests
+pnpm dev                 # then, in another shell:
+node scripts/smoke.mjs   # 43 end-to-end checks against the running server
 ```
 
 The smoke test plants marked secrets in staged scenes, hidden tokens, stat

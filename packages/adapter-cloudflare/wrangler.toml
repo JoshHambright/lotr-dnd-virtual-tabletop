@@ -1,0 +1,23 @@
+name = "virtual-tabletop"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# The built client is served straight off the Worker, so the app and its
+# websocket live on one origin — no CORS, no second deploy, one URL to share.
+[assets]
+directory = "../client/dist"
+binding = "STATIC"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[durable_objects.bindings]]
+name = "TABLE"
+class_name = "TableRoom"
+
+# SQLite-backed Durable Objects are on the free plan; the classic key-value
+# ones are not. Map images live in this same storage as chunked blobs, which
+# is why the project needs no R2 bucket (and so no billing setup at all).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TableRoom"]

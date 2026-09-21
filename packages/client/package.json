@@ -1,0 +1,25 @@
+{
+  "name": "@vtt/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The browser app: map, tokens, fog, dice and sheets",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@vtt/core": "workspace:*",
+    "@vtt/dice": "workspace:*",
+    "@vtt/protocol": "workspace:*",
+    "@vtt/rulesets": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5"
+  }
+}

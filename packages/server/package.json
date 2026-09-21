@@ -1,0 +1,15 @@
+{
+  "name": "@vtt/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted table server",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vtt/core": "workspace:*",
+    "@vtt/dice": "workspace:*",
+    "@vtt/protocol": "workspace:*"
+  }
+}

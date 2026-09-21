@@ -1,0 +1,10 @@
+{
+  "name": "@vtt/dice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dice expression parsing and rolling",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

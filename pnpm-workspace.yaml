@@ -1,0 +1,9 @@
+packages:
+  - 'packages/*'
+
+# pnpm does not hoist by default, so a package can only import what it declares.
+# In a monorepo where several agents work in parallel, that strictness is the
+# point: a phantom dependency is a cross-workstream coupling nobody chose.
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
