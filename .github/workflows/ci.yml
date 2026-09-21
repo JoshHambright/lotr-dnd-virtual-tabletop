@@ -18,3 +18,21 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
+
+  end-to-end:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Start the real Worker and assert a real player socket never receives
+      # the GM's material.
+      - name: Start the Worker
+        run: npx wrangler dev --port 8787 &
+      - name: Wait for it
+        run: npx wait-on http://127.0.0.1:8787 --timeout 90000
+      - run: node scripts/smoke.mjs
