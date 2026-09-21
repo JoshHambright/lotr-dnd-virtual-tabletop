@@ -212,3 +212,25 @@ Two consequences worth stating:
 - Validation lives at `@vtt/protocol/schemas`, not on the package root, so a
   browser importing protocol types does not drag zod into the bundle. Keeping
   them separate is worth 14 KB gzipped, which is how it was found.
+
+---
+
+## D-015 — Two type environments, not one
+
+**Decided.** `pnpm typecheck` runs `tsc` twice: once over the browser and
+isomorphic packages, once over the Cloudflare adapter with Workers globals and
+no DOM.
+
+A single root config had to declare both `@cloudflare/workers-types` and
+`vite/client` ambiently, which meant every package saw both. Client code could
+reach for `WebSocketPair` and typecheck cleanly; worker code could reach for
+`document` and do the same.
+
+Checking `core`, `dice` and `protocol` a second time under a DOM-free
+environment is not duplicated work — it is the thing that proves they are
+genuinely isomorphic, which the whole self-host-or-edge plan rests on.
+
+Found when CI failed on a clean install while a local typecheck passed: the
+local `node_modules` still held packages hoisted by an earlier npm install.
+pnpm's refusal to hoist surfaced a dependency that was never declared, which is
+exactly what D-013 bought.

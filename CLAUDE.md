@@ -73,6 +73,15 @@ pnpm dev             # the Cloudflare adapter, on :8787
   `undefined`, and callers legitimately hold absent values.
 - **zod stays out of the browser bundle.** Import validation from
   `@vtt/protocol/schemas`, never from the package root.
+- **Two type environments, on purpose.** `tsconfig.json` covers the browser and
+  isomorphic packages; `tsconfig.worker.json` covers the Cloudflare adapter with
+  Workers globals and no DOM. The shared packages are checked under both, which
+  is what proves they are isomorphic rather than quietly leaning on a browser
+  API. `pnpm typecheck` runs both — a single environment would let client code
+  reach for a Workers global and still pass.
+- **Verify against a clean install before trusting green.** `pnpm` does not
+  hoist, so leftover `node_modules` from an earlier tool can hide a missing
+  dependency that CI will find.
 - **A rule we cannot verify ships as pack data marked `unverified`**, so the app
   can say it is unsure rather than quietly asserting a rule at someone's table.
 - **Homage, never reproduction.** Skins evoke a system with openly licensed

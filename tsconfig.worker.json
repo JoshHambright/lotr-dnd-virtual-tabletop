@@ -1,0 +1,17 @@
+{
+  // The Cloudflare adapter and the packages it imports, compiled against
+  // Workers globals with no DOM. Checking the shared packages a second time
+  // under a different environment is the point: it proves they are genuinely
+  // isomorphic rather than quietly leaning on a browser API.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": [
+    "packages/adapter-cloudflare/**/*",
+    "packages/core/src/**/*",
+    "packages/dice/src/**/*",
+    "packages/protocol/src/**/*"
+  ]
+}
