@@ -8,6 +8,7 @@ import type { Character, Scene } from '@vtt/core'
 import { newCharacter, newToken } from '@vtt/core'
 import type { TableClient } from '../client.js'
 import { CharacterSheet } from './CharacterSheet.js'
+import { newId } from '../ids.js'
 
 interface Props {
   client: TableClient
@@ -22,7 +23,7 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
   const mine = characters.filter((character) => character.ownerName === client.name)
 
   const create = () => {
-    const id = crypto.randomUUID()
+    const id = newId()
     client.send({ t: 'character.upsert', character: newCharacter(id, client.name, client.name) })
     onOpen(id)
   }
@@ -31,7 +32,7 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
     if (!scene) return
     client.send({
       t: 'token.create',
-      token: newToken(crypto.randomUUID(), scene.id, scene.width / 2, scene.height / 2, {
+      token: newToken(newId(), scene.id, scene.width / 2, scene.height / 2, {
         label: character.name,
         characterId: character.id,
         hp: character.currentHp,

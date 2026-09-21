@@ -14,6 +14,7 @@ import { uploadAsset, uploadBlob } from '../api.js'
 import { isPdf } from '../pdf.js'
 import type { LoadedPdf } from '../pdf.js'
 import type { TableClient } from '../client.js'
+import { newId } from '../ids.js'
 
 interface Props {
   client: TableClient
@@ -70,10 +71,11 @@ export function ScenesPanel({
       }
 
       const asset = await uploadAsset(client.roomCode, client.gmKey, file)
-      const id = crypto.randomUUID()
+      const id = newId()
       client.send({ t: 'scene.create', scene: newScene(id, cleanName(file.name), asset.width, asset.height, asset.id) })
       onEditScene(id)
     } catch (cause) {
+      console.error(cause)
       setError(cause instanceof Error ? cause.message : 'Could not add that map')
     } finally {
       setBusy(false)
@@ -84,14 +86,14 @@ export function ScenesPanel({
     if (!client.gmKey) return
     const rendered = await doc.renderPage(page, 3000)
     const asset = await uploadBlob(client.roomCode, client.gmKey, rendered.blob, rendered.width, rendered.height)
-    const id = crypto.randomUUID()
+    const id = newId()
     const label = doc.pageCount > 1 ? `${cleanName(name)} — p${page}` : cleanName(name)
     client.send({ t: 'scene.create', scene: newScene(id, label, asset.width, asset.height, asset.id) })
     onEditScene(id)
   }
 
   const addBlankScene = () => {
-    const id = crypto.randomUUID()
+    const id = newId()
     client.send({ t: 'scene.create', scene: newScene(id, 'Battlemat', 1400, 1000, null) })
     onEditScene(id)
   }
@@ -150,7 +152,10 @@ export function ScenesPanel({
                     pdf.doc.destroy()
                     setPdf(null)
                   })
-                  .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not read that page'))
+                  .catch((cause) => {
+                    console.error(cause)
+                    setError(cause instanceof Error ? cause.message : 'Could not read that page')
+                  })
                   .finally(() => setBusy(false))
               }}
             >

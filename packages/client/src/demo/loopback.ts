@@ -18,6 +18,7 @@ import { roll as rollDice } from '@vtt/dice'
 import type { RollMode } from '@vtt/dice'
 import type { ClientMessage, ServerMessage } from '@vtt/protocol'
 import type { Transport, TransportHandlers } from '../transport.js'
+import { newId } from '../ids.js'
 
 export class LoopbackTransport implements Transport {
   #handlers: TransportHandlers | null = null
@@ -83,7 +84,7 @@ export class LoopbackTransport implements Transport {
           {
             t: 'chat.add',
             message: {
-              id: crypto.randomUUID(),
+              id: newId(),
               at: Date.now(),
               by: this.#name,
               text: message.text,
@@ -120,7 +121,7 @@ export class LoopbackTransport implements Transport {
       {
         t: 'roll.add',
         roll: {
-          id: crypto.randomUUID(),
+          id: newId(),
           at: Date.now(),
           by: this.#name,
           label: message.label,

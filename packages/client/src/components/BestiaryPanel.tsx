@@ -13,6 +13,7 @@ import type { Encounter, Scene, StatBlock } from '@vtt/core'
 import { newStatBlock, newToken } from '@vtt/core'
 import { ABILITIES, ABILITY_NAMES, abilityModifier, formatModifier } from '@vtt/rulesets'
 import type { TableClient } from '../client.js'
+import { newId } from '../ids.js'
 
 interface Props {
   client: TableClient
@@ -28,7 +29,7 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
   const open = bestiary.find((entry) => entry.id === openId) ?? null
 
   const addCreature = () => {
-    const id = crypto.randomUUID()
+    const id = newId()
     client.send({ t: 'statblock.upsert', statBlock: newStatBlock(id, 'New creature') })
     onOpen(id)
   }
@@ -40,7 +41,7 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
     const offset = (index - (total - 1) / 2) * spread
     client.send({
       t: 'token.create',
-      token: newToken(crypto.randomUUID(), scene.id, scene.width / 2 + offset, scene.height / 2, {
+      token: newToken(newId(), scene.id, scene.width / 2 + offset, scene.height / 2, {
         label: total > 1 ? `${statBlock.name} ${index + 1}` : statBlock.name,
         color: statBlock.color,
         statBlockId: statBlock.id,
@@ -297,7 +298,7 @@ function EncountersTab({
   const open = encounters.find((entry) => entry.id === openId) ?? null
 
   const add = () => {
-    const id = crypto.randomUUID()
+    const id = newId()
     client.send({ t: 'encounter.upsert', encounter: { id, name: 'New encounter', notes: '', members: [] } })
     setOpenId(id)
   }

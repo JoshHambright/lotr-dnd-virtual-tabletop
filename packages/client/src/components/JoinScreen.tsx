@@ -66,6 +66,7 @@ export function JoinScreen({ initialCode, onJoin }: { initialCode: string; onJoi
       remember(name.trim())
       onJoin({ code: room.code, name: name.trim(), gmKey: room.gmKey })
     } catch (cause) {
+      console.error(cause)
       setError(cause instanceof Error ? cause.message : 'Could not open a table')
       setBusy(false)
     }

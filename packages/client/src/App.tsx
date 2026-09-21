@@ -26,6 +26,7 @@ import { assetUrl } from './api.js'
 import { detectGridInImage } from './gridDetect.js'
 import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
+import { newId } from './ids.js'
 
 type Tab = 'dice' | 'sheets' | 'maps' | 'bestiary' | 'talk'
 
@@ -104,7 +105,7 @@ export function Table({
     if (!visibleScene) return
     client.send({
       t: 'token.create',
-      token: newToken(crypto.randomUUID(), visibleScene.id, visibleScene.width / 2, visibleScene.height / 2, {
+      token: newToken(newId(), visibleScene.id, visibleScene.width / 2, visibleScene.height / 2, {
         label: 'Token',
       }),
     })
