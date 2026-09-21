@@ -18,6 +18,7 @@ import type { Scene, Token } from '@vtt/core'
 import type { TableClient } from '../client.js'
 import { assetUrl } from '../api.js'
 import { movedEnough, readWheel, zoomFactor } from '../input.js'
+import type { Rect } from '../view.js'
 import {
   clampScale,
   contrastingInk,
@@ -32,7 +33,7 @@ import {
 } from '../view.js'
 import type { Viewport } from '../view.js'
 
-export type Tool = 'select' | 'reveal' | 'conceal' | 'measure'
+export type Tool = 'select' | 'reveal' | 'conceal' | 'measure' | 'align'
 
 interface Props {
   client: TableClient
@@ -43,10 +44,15 @@ interface Props {
   previewAsPlayer: boolean
   selectedTokenId: string | null
   onSelectToken: (id: string | null) => void
+  /** The box dragged for grid calibration, held by the parent so the panel can read it. */
+  alignBox?: Rect | null
+  onAlignBox?: (box: Rect | null) => void
+  /** Candidate grid drawn over the map while calibrating. */
+  gridPreview?: { size: number; offsetX: number; offsetY: number } | null
 }
 
 interface DragState {
-  kind: 'token' | 'pan' | 'fog' | 'measure'
+  kind: 'token' | 'pan' | 'fog' | 'measure' | 'align'
   tokenId?: string
   /** Offset from the token's centre to the grab point, so it does not jump. */
   grabX?: number
@@ -65,7 +71,18 @@ const EASE = 0.28
 /** Below this the easing is finished and the view snaps, so it cannot creep. */
 const EASE_EPSILON = 0.01
 
-export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, selectedTokenId, onSelectToken }: Props) {
+export function MapView({
+  client,
+  scene,
+  tool,
+  brushRadius,
+  previewAsPlayer,
+  selectedTokenId,
+  onSelectToken,
+  alignBox = null,
+  onAlignBox,
+  gridPreview = null,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const hudRef = useRef<HTMLSpanElement>(null)
 
@@ -78,6 +95,7 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
   const hoverRef = useRef<string | null>(null)
   const spaceRef = useRef(false)
   const measureRef = useRef<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null)
+  const alignRef = useRef<Rect | null>(null)
   const fogLayerRef = useRef<FogLayer | null>(null)
 
   /** Redraw only when something changed. An idle table should not spin the GPU. */
@@ -103,6 +121,10 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
   }, [client, scene, invalidate])
 
   // Frame the map the first time a scene appears, and again when it changes.
+  useEffect(() => {
+    invalidate()
+  }, [alignBox, gridPreview, invalidate])
+
   useEffect(() => {
     if (!scene || fittedRef.current === scene.id) return
     fittedRef.current = scene.id
@@ -194,6 +216,12 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
 
       if (current.fog.enabled) drawFog(context, current, fogLayerRef, asPlayer)
 
+      // The candidate grid sits over the art so the GM can see it land on the
+      // lines already drawn there.
+      if (gridPreview) drawPreviewGrid(context, current, gridPreview, drawn)
+      const box = alignRef.current ?? alignBox
+      if (tool === 'align' && box) drawAlignBox(context, box, drawn)
+
       drawCursors(context, client, current.id, drawn)
       if (measureRef.current) drawMeasurement(context, current, measureRef.current, drawn)
       if (dragRef.current?.kind === 'fog') {
@@ -205,7 +233,7 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
 
     frame = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(frame)
-  }, [client, scene, selectedTokenId, asPlayer, gmKey, brushRadius, tool, invalidate])
+  }, [client, scene, selectedTokenId, asPlayer, gmKey, brushRadius, tool, invalidate, alignBox, gridPreview])
 
   // Remote cursors fade out on their own, so keep the loop honest for a while
   // after one arrives rather than leaving a stale arrow on screen.
@@ -364,6 +392,19 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
       // what a desktop canvas app does, and they work whatever tool is active.
       if (event.button === 1 || event.button === 2 || spaceRef.current) return startPan()
 
+      if (tool === 'align' && client.role === 'gm') {
+        alignRef.current = { x: point.x, y: point.y, width: 0, height: 0 }
+        dragRef.current = {
+          kind: 'align',
+          pressX: event.clientX,
+          pressY: event.clientY,
+          lastX: point.x,
+          lastY: point.y,
+          engaged: true,
+        }
+        return invalidate()
+      }
+
       if (tool === 'measure') {
         measureRef.current = { from: point, to: point }
         dragRef.current = {
@@ -480,6 +521,12 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
           if (measureRef.current) measureRef.current = { ...measureRef.current, to: point }
           return invalidate()
         }
+
+        case 'align': {
+          const box = alignRef.current
+          if (box) alignRef.current = { ...box, width: point.x - box.x, height: point.y - box.y }
+          return invalidate()
+        }
       }
     },
     [brushRadius, client, pointToMap, scene, tool, invalidate],
@@ -491,10 +538,15 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
       dragRef.current = null
       if (drag?.kind === 'token' && drag.engaged) client.commitMoves()
       if (drag?.kind === 'measure') measureRef.current = null
+      if (drag?.kind === 'align') {
+        const box = alignRef.current
+        alignRef.current = null
+        onAlignBox?.(box && Math.abs(box.width) > 2 && Math.abs(box.height) > 2 ? box : null)
+      }
       applyCursor(event.currentTarget, tool, null, hoverRef.current, spaceRef.current)
       invalidate()
     },
-    [client, tool, invalidate],
+    [client, tool, invalidate, onAlignBox],
   )
 
   return (
@@ -552,6 +604,10 @@ function applyCursor(
   }
   if (tool === 'reveal' || tool === 'conceal') {
     canvas.style.cursor = 'cell'
+    return
+  }
+  if (tool === 'align') {
+    canvas.style.cursor = 'crosshair'
     return
   }
   canvas.style.cursor = hovered ? 'move' : 'grab'
@@ -842,6 +898,67 @@ function drawMeasurement(
   context.strokeText(label, (from.x + to.x) / 2, (from.y + to.y) / 2 - 8 / view.scale)
   context.fillStyle = '#e7eaee'
   context.fillText(label, (from.x + to.x) / 2, (from.y + to.y) / 2 - 8 / view.scale)
+  context.restore()
+}
+
+/** The candidate grid, drawn over the art so it can be judged against it. */
+function drawPreviewGrid(
+  context: CanvasRenderingContext2D,
+  scene: Scene,
+  grid: { size: number; offsetX: number; offsetY: number },
+  view: Viewport,
+): void {
+  const { size, offsetX, offsetY } = grid
+  if (!(size > 1) || size * view.scale < 3) return
+
+  context.save()
+  context.strokeStyle = 'rgba(111, 155, 209, 0.85)'
+  context.lineWidth = Math.max(0.6, 1 / view.scale)
+  context.beginPath()
+  for (let x = offsetX % size; x <= scene.width; x += size) {
+    context.moveTo(x, 0)
+    context.lineTo(x, scene.height)
+  }
+  for (let y = offsetY % size; y <= scene.height; y += size) {
+    context.moveTo(0, y)
+    context.lineTo(scene.width, y)
+  }
+  context.stroke()
+  context.restore()
+}
+
+/** The box being dragged across a known number of squares. */
+function drawAlignBox(context: CanvasRenderingContext2D, box: Rect, view: Viewport): void {
+  const x = Math.min(box.x, box.x + box.width)
+  const y = Math.min(box.y, box.y + box.height)
+  const width = Math.abs(box.width)
+  const height = Math.abs(box.height)
+
+  context.save()
+  context.fillStyle = 'rgba(111, 155, 209, 0.12)'
+  context.fillRect(x, y, width, height)
+
+  context.strokeStyle = '#6f9bd1'
+  context.lineWidth = Math.max(1, 1.5 / view.scale)
+  context.setLineDash([6 / view.scale, 4 / view.scale])
+  context.strokeRect(x, y, width, height)
+  context.setLineDash([])
+
+  // Corner ticks, so the exact edges are visible against busy map art.
+  const tick = Math.min(width, height) * 0.18
+  context.lineWidth = Math.max(1.2, 2.5 / view.scale)
+  for (const [cx, cy, dx, dy] of [
+    [x, y, 1, 1],
+    [x + width, y, -1, 1],
+    [x, y + height, 1, -1],
+    [x + width, y + height, -1, -1],
+  ] as const) {
+    context.beginPath()
+    context.moveTo(cx + dx * tick, cy)
+    context.lineTo(cx, cy)
+    context.lineTo(cx, cy + dy * tick)
+    context.stroke()
+  }
   context.restore()
 }
 

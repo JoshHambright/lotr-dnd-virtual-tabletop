@@ -14,13 +14,14 @@
     "@vtt/dice": "workspace:*",
     "@vtt/protocol": "workspace:*",
     "@vtt/rulesets": "workspace:*",
+    "pdfjs-dist": "^6.3.289",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "vite": "^6.0.7",
-    "@vitejs/plugin-react": "^4.3.4",
     "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5"
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
   }
 }

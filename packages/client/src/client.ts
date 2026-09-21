@@ -315,8 +315,8 @@ export class TableClient {
     }, MOVE_THROTTLE_MS)
   }
 
-  roll(expression: string, label: string, mode: RollMode, visibility: 'public' | 'gm'): void {
-    this.#send({ k: 'roll', expression, label, mode, visibility })
+  roll(expression: string, label: string, mode: RollMode, visibility: 'public' | 'gm', color?: string): void {
+    this.#send({ k: 'roll', expression, label, mode, visibility, ...(color ? { color } : {}) })
   }
 
   chat(text: string, visibility: 'public' | 'gm'): void {

@@ -392,6 +392,7 @@ export class TableRoom {
       // Shared so every client tumbles the dice identically before settling
       // on the numbers the server already decided.
       seed: Math.floor(secureRandom() * 0xffffffff),
+      ...(message.color ? { color: message.color } : {}),
     }
 
     this.#apply([{ t: 'roll.add', roll: entry }], true)

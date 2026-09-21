@@ -62,6 +62,24 @@ export async function prepareImage(file: File, maxEdge = 3000): Promise<{ blob: 
   return { blob, width, height }
 }
 
+/** Uploads an already-prepared bitmap, which is what a rasterized PDF page is. */
+export async function uploadBlob(
+  code: string,
+  gmKey: string,
+  blob: Blob,
+  width: number,
+  height: number,
+): Promise<UploadedAsset> {
+  const response = await fetch(`/api/room/${encodeURIComponent(code)}/asset?key=${encodeURIComponent(gmKey)}`, {
+    method: 'PUT',
+    headers: { 'content-type': blob.type || 'image/webp' },
+    body: blob,
+  })
+  if (!response.ok) throw new Error(await readError(response, 'Could not upload that image'))
+  const body = (await response.json()) as { id: string }
+  return { id: body.id, width, height }
+}
+
 export async function uploadAsset(code: string, gmKey: string, file: File): Promise<UploadedAsset> {
   const { blob, width, height } = await prepareImage(file)
   const response = await fetch(`/api/room/${encodeURIComponent(code)}/asset?key=${encodeURIComponent(gmKey)}`, {

@@ -154,6 +154,7 @@ export const clientMessageSchema = z.discriminatedUnion('k', [
     label: z.string().max(80),
     mode: z.enum(['normal', 'advantage', 'disadvantage']),
     visibility: z.enum(['public', 'gm']),
+    color: colour.optional(),
   }),
   z.object({
     k: z.literal('chat'),

@@ -146,6 +146,12 @@ export interface Roll {
   result: RollResult
   /** A gm roll is delivered only to the GM's own connections. */
   visibility: 'public' | 'gm'
+  /**
+   * The roller's chosen die colour, so everyone at the table sees the same
+   * person's dice the same way. Cosmetic, and optional — an older client that
+   * does not send one still rolls.
+   */
+  color?: string
   /** Shared seed so every client animates the same tumble. */
   seed: number
 }

@@ -19,6 +19,8 @@ export type ClientMessage =
       label: string
       mode: RollMode
       visibility: 'public' | 'gm'
+      /** Hex colour for the roller's dice; ignored if malformed. */
+      color?: string
     }
   | { k: 'chat'; text: string; visibility: 'public' | 'gm' }
   | { k: 'cursor'; cursor: Presence['cursor'] }

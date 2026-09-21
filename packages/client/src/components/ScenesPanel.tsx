@@ -10,7 +10,9 @@ import { useState } from 'react'
 import type { Scene } from '@vtt/core'
 import { newScene } from '@vtt/core'
 import { revealedFraction } from '@vtt/core'
-import { uploadAsset } from '../api.js'
+import { uploadAsset, uploadBlob } from '../api.js'
+import { isPdf } from '../pdf.js'
+import type { LoadedPdf } from '../pdf.js'
 import type { TableClient } from '../client.js'
 
 interface Props {
@@ -21,6 +23,16 @@ interface Props {
   onEditScene: (id: string | null) => void
   brushRadius: number
   onBrushRadius: (radius: number) => void
+}
+
+/** Drops the extension and tidies the separators a filename tends to carry. */
+function cleanName(filename: string): string {
+  return (
+    filename
+      .replace(/\.[^.]+$/, '')
+      .replace(/[_-]+/g, ' ')
+      .trim() || 'Map'
+  )
 }
 
 export function ScenesPanel({
@@ -34,6 +46,8 @@ export function ScenesPanel({
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** A PDF waiting for someone to say which page holds the map. */
+  const [pdf, setPdf] = useState<{ doc: LoadedPdf; name: string; page: number } | null>(null)
   const editing = scenes.find((scene) => scene.id === editingSceneId) ?? null
 
   const addScene = async (file: File) => {
@@ -41,16 +55,39 @@ export function ScenesPanel({
     setBusy(true)
     setError(null)
     try {
+      if (isPdf(file)) {
+        // Loaded on demand: pdf.js is about a megabyte, and a table that never
+        // opens a PDF should not pay for it.
+        const { loadPdf } = await import('../pdf.js')
+        const doc = await loadPdf(file)
+        if (doc.pageCount === 1) {
+          await addPdfPage(doc, file.name, 1)
+          doc.destroy()
+        } else {
+          setPdf({ doc, name: file.name, page: 1 })
+        }
+        return
+      }
+
       const asset = await uploadAsset(client.roomCode, client.gmKey, file)
       const id = crypto.randomUUID()
-      const scene = newScene(id, file.name.replace(/\.[^.]+$/, ''), asset.width, asset.height, asset.id)
-      client.send({ t: 'scene.create', scene })
+      client.send({ t: 'scene.create', scene: newScene(id, cleanName(file.name), asset.width, asset.height, asset.id) })
       onEditScene(id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not add that map')
     } finally {
       setBusy(false)
     }
+  }
+
+  const addPdfPage = async (doc: LoadedPdf, name: string, page: number) => {
+    if (!client.gmKey) return
+    const rendered = await doc.renderPage(page, 3000)
+    const asset = await uploadBlob(client.roomCode, client.gmKey, rendered.blob, rendered.width, rendered.height)
+    const id = crypto.randomUUID()
+    const label = doc.pageCount > 1 ? `${cleanName(name)} — p${page}` : cleanName(name)
+    client.send({ t: 'scene.create', scene: newScene(id, label, asset.width, asset.height, asset.id) })
+    onEditScene(id)
   }
 
   const addBlankScene = () => {
@@ -63,10 +100,10 @@ export function ScenesPanel({
     <div className="panel">
       <div className="panel__actions">
         <label className={`button${busy ? ' button--busy' : ''}`}>
-          {busy ? 'Uploading…' : 'Add map image'}
+          {busy ? 'Reading…' : 'Add map'}
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,.pdf"
             hidden
             disabled={busy}
             onChange={(event) => {
@@ -81,6 +118,57 @@ export function ScenesPanel({
         </button>
       </div>
       {error ? <p className="error">{error}</p> : null}
+
+      {pdf ? (
+        <div className="scene-editor">
+          <p className="hint">
+            <strong>{pdf.name}</strong> has {pdf.doc.pageCount} pages. Which one is the map?
+          </p>
+          <label className="field">
+            <span>Page</span>
+            <input
+              className="input input--tiny"
+              type="number"
+              min={1}
+              max={pdf.doc.pageCount}
+              value={pdf.page}
+              onChange={(event) =>
+                setPdf({ ...pdf, page: Math.max(1, Math.min(pdf.doc.pageCount, Number(event.target.value) || 1)) })
+              }
+            />
+          </label>
+          <div className="panel__actions">
+            <button
+              type="button"
+              className="button button--primary button--small"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true)
+                setError(null)
+                void addPdfPage(pdf.doc, pdf.name, pdf.page)
+                  .then(() => {
+                    pdf.doc.destroy()
+                    setPdf(null)
+                  })
+                  .catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not read that page'))
+                  .finally(() => setBusy(false))
+              }}
+            >
+              {busy ? 'Rendering…' : 'Use this page'}
+            </button>
+            <button
+              type="button"
+              className="button button--small"
+              onClick={() => {
+                pdf.doc.destroy()
+                setPdf(null)
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <ul className="scene-list">
         {scenes.map((scene) => (

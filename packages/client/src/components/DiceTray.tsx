@@ -80,6 +80,7 @@ export function DiceTray({ roll, nonce }: Props) {
     const context = canvas.getContext('2d')
     if (!context) return
 
+    const palette = paletteFor(roll.color)
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     const started = performance.now()
     let frame = 0
@@ -136,7 +137,7 @@ export function DiceTray({ roll, nonce }: Props) {
           orientation = quatSlerp(spun, die.target, easeOutBack(settleT))
         }
 
-        drawDie(context, die, orientation, x, y - bounce, radius, settleT >= 1)
+        drawDie(context, die, orientation, x, y - bounce, radius, settleT >= 1, palette)
       })
 
       // Once every die is still there is nothing left to animate, so stop
@@ -253,6 +254,29 @@ function layOutDice(roll: Roll): Die[] {
   return dice.slice(0, 40)
 }
 
+interface Palette {
+  r: number
+  g: number
+  b: number
+  ink: string
+}
+
+/**
+ * A die's colour is the roller's, so at a glance you can tell whose dice are
+ * on the felt. Defaults to the cool slate the rest of the chrome uses.
+ */
+function paletteFor(hex: string | undefined): Palette {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex ?? '')
+  if (!match) return { r: 96, g: 100, b: 112, ink: '#f4f6f8' }
+  const value = parseInt(match[1]!, 16)
+  const r = (value >> 16) & 255
+  const g = (value >> 8) & 255
+  const b = value & 255
+  // Pips have to stay readable on a pale die as well as a dark one.
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return { r, g, b, ink: luminance > 0.62 ? '#16191f' : '#f4f6f8' }
+}
+
 function drawDie(
   context: CanvasRenderingContext2D,
   die: Die,
@@ -261,6 +285,7 @@ function drawDie(
   cy: number,
   radius: number,
   settled: boolean,
+  palette: Palette,
 ): void {
   const { solid } = die
   const scale = radius / 1.5
@@ -301,7 +326,7 @@ function drawDie(
     context.closePath()
 
     const lit = Math.max(0, normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2])
-    context.fillStyle = shade(die.kept, lit)
+    context.fillStyle = shade(palette, die.kept, lit)
     context.fill()
 
     context.lineWidth = Math.max(0.6, radius * 0.035)
@@ -313,7 +338,7 @@ function drawDie(
       const size = radius * (die.sides >= 20 ? 0.52 : die.sides >= 12 ? 0.58 : 0.7)
       context.save()
       context.globalAlpha = die.kept ? 1 : 0.5
-      context.fillStyle = die.kept ? '#f4f6f8' : '#aab3bd'
+      context.fillStyle = die.kept ? palette.ink : 'rgba(170, 179, 189, 0.85)'
       context.font = `650 ${size}px ui-sans-serif, system-ui, sans-serif`
       context.textAlign = 'center'
       context.textBaseline = 'middle'
@@ -341,15 +366,20 @@ function drawDie(
   context.restore()
 }
 
-/** Cool slate faces so the lit edges read; a dropped die desaturates. */
-function shade(kept: boolean, lit: number): string {
-  // A wider range than looks right on paper: on a small die the facets have
-  // only a few pixels each, so gentle shading reads as one flat blob.
+/**
+ * Shades one facet of the die's colour.
+ *
+ * A wider light range than looks right on paper: on a small die each facet is
+ * only a few pixels, so gentle shading reads as one flat blob instead of a
+ * solid. A dropped die keeps its hue but loses most of its contrast.
+ */
+function shade(palette: Palette, kept: boolean, lit: number): string {
   const curved = Math.pow(lit, 0.72)
-  const base = kept ? 38 : 32
-  const range = kept ? 132 : 58
-  const value = Math.round(base + curved * range)
-  return `rgb(${value}, ${Math.round(value * 1.04)}, ${Math.round(value * 1.16)})`
+  const floor = kept ? 0.3 : 0.26
+  const range = kept ? 0.95 : 0.34
+  const factor = floor + curved * range
+  const channel = (value: number) => Math.round(Math.max(0, Math.min(255, value * factor)))
+  return `rgb(${channel(palette.r)}, ${channel(palette.g)}, ${channel(palette.b)})`
 }
 
 /** Overshoots a little on landing, the way a die rocks before it settles. */

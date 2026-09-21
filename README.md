@@ -15,6 +15,12 @@ sheet, the dice roller nobody else can see.
 
 ## What it does
 
+**Maps from wherever they came from.** Images, or a page out of a PDF — which
+is how published adventures ship their maps. Multi-page PDFs ask which page.
+Then drag a box across a few squares you can see on the art and the grid lines
+up to it: nobody knows their map is 63.4 pixels to the square, but anyone can
+draw a box around three squares.
+
 **One map, everyone on it.** The GM decides which map the table is looking at.
 Everyone drags tokens and sees the moves happen live, along with each other's
 cursors. Square grid with snapping, and a measuring tool in whatever units the

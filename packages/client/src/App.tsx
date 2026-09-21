@@ -19,6 +19,12 @@ import { ScenesPanel } from './components/ScenesPanel.js'
 import { BestiaryPanel } from './components/BestiaryPanel.js'
 import { TokenInspector } from './components/TokenInspector.js'
 import { DiceTray } from './components/DiceTray.js'
+import { GridCalibrator } from './components/GridCalibrator.js'
+import type { Rect } from './view.js'
+import { getImage, solveGrid } from './view.js'
+import { assetUrl } from './api.js'
+import { detectGridInImage } from './gridDetect.js'
+import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
 
 type Tab = 'dice' | 'sheets' | 'maps' | 'bestiary' | 'talk'
@@ -71,6 +77,11 @@ export function Table({
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null)
   const [openCharacterId, setOpenCharacterId] = useState<string | null>(null)
   const [openStatBlockId, setOpenStatBlockId] = useState<string | null>(null)
+  const [alignBox, setAlignBox] = useState<Rect | null>(null)
+  const [alignAcross, setAlignAcross] = useState(1)
+  const [alignDown, setAlignDown] = useState(1)
+  const [detected, setDetected] = useState<DetectedGrid | null>(null)
+  const [detecting, setDetecting] = useState<'idle' | 'working' | 'nothing'>('idle')
 
   const isGm = client.role === 'gm'
   const room = client.room
@@ -106,6 +117,55 @@ export function Table({
   }, [client, client.lastError])
 
   const canDrawFog = isGm && Boolean(visibleScene)
+
+  const alignSolution = alignBox ? solveGrid(alignBox, alignAcross, alignDown) : null
+  // A box the GM drew is a deliberate answer, so it wins over a detected one.
+  const candidate = alignSolution ?? detected
+  const gridPreview = candidate
+    ? { size: candidate.size, offsetX: candidate.offsetX, offsetY: candidate.offsetY }
+    : null
+
+  const leaveAlignment = () => {
+    setAlignBox(null)
+    setAlignAcross(1)
+    setAlignDown(1)
+    setDetected(null)
+    setDetecting('idle')
+  }
+
+  const findGrid = () => {
+    if (!visibleScene?.assetId) return
+    const image = getImage(assetUrl(client.roomCode, visibleScene.assetId, client.gmKey))
+    if (!image) return
+    setDetecting('working')
+    // A frame first, so the button shows it is working before the main thread
+    // goes away for a moment.
+    requestAnimationFrame(() => {
+      const found = detectGridInImage(image, visibleScene.width, visibleScene.height)
+      setAlignBox(null)
+      setDetected(found)
+      setDetecting(found ? 'idle' : 'nothing')
+    })
+  }
+
+  const applyGrid = () => {
+    if (!visibleScene || !candidate) return
+    client.send({
+      t: 'scene.update',
+      id: visibleScene.id,
+      patch: {
+        grid: {
+          ...visibleScene.grid,
+          size: round(candidate.size),
+          offsetX: round(candidate.offsetX),
+          offsetY: round(candidate.offsetY),
+          visible: true,
+        },
+      },
+    })
+    leaveAlignment()
+    setTool('select')
+  }
 
   return (
     <div className="table">
@@ -153,6 +213,17 @@ export function Table({
                 onClick={() => setTool('conceal')}
               >
                 Cover
+              </button>
+              <button
+                type="button"
+                className={`chip${tool === 'align' ? ' chip--on' : ''}`}
+                title="Drag a box across squares you can see on the map"
+                onClick={() => {
+                  leaveAlignment()
+                  setTool(tool === 'align' ? 'select' : 'align')
+                }}
+              >
+                Align grid
               </button>
             </>
           ) : null}
@@ -216,7 +287,66 @@ export function Table({
             previewAsPlayer={previewAsPlayer}
             selectedTokenId={selectedTokenId}
             onSelectToken={setSelectedTokenId}
+            alignBox={alignBox}
+            onAlignBox={setAlignBox}
+            gridPreview={gridPreview}
           />
+
+          {tool === 'align' && visibleScene ? (
+            candidate ? (
+              <GridCalibrator
+                measured={alignSolution !== null}
+                confidence={detected && !alignSolution ? detected.confidence : null}
+                across={alignAcross}
+                down={alignDown}
+                solution={candidate}
+                unitsPerSquare={visibleScene.grid.unitsPerSquare}
+                unitLabel={visibleScene.grid.unitLabel}
+                onAcross={setAlignAcross}
+                onDown={setAlignDown}
+                onUnits={(unitsPerSquare) =>
+                  client.send({
+                    t: 'scene.update',
+                    id: visibleScene.id,
+                    patch: { grid: { ...visibleScene.grid, unitsPerSquare } },
+                  })
+                }
+                canDetect={Boolean(visibleScene.assetId)}
+                detecting={detecting}
+                onDetect={findGrid}
+                onApply={applyGrid}
+                onCancel={() => {
+                  leaveAlignment()
+                  setTool('select')
+                }}
+              />
+            ) : (
+              <div className="calibrator">
+                <p className="calibrator__lead">
+                  Drag a box across squares you can see on the map — one is enough, three or four is more accurate.
+                </p>
+                {visibleScene.assetId ? (
+                  <>
+                    <p className="calibrator__hint">Or let it read the lines off the map itself.</p>
+                    <div className="calibrator__actions">
+                      <button
+                        type="button"
+                        className="button button--small"
+                        disabled={detecting === 'working'}
+                        onClick={findGrid}
+                      >
+                        {detecting === 'working' ? 'Looking…' : 'Find the grid'}
+                      </button>
+                    </div>
+                    {detecting === 'nothing' ? (
+                      <p className="calibrator__warning">No grid found on this map. Drag a box instead.</p>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            )
+          ) : null}
+
           <DiceTray roll={latestRoll} nonce={client.rollCount} />
           {client.lastError ? <div className="toast">{client.lastError}</div> : null}
         </div>
@@ -315,6 +445,11 @@ export function Table({
       </div>
     </div>
   )
+}
+
+/** Two decimals is finer than any map is drawn, and keeps the panel readable. */
+function round(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 function statusLabel(status: string): string {

@@ -116,3 +116,64 @@ export function contrastingInk(hex: string): string {
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance > 0.6 ? '#1b1510' : '#f6efe2'
 }
+
+// --- Grid calibration --------------------------------------------------------
+
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface GridSolution {
+  size: number
+  offsetX: number
+  offsetY: number
+  /**
+   * How far from square the measured cells are, 0 to 1. Map art is rarely
+   * perfect, but a large skew means the box was dragged across the wrong
+   * number of squares — worth saying so rather than silently averaging.
+   */
+  skew: number
+}
+
+/** Normalizes a dragged box, which may have been drawn in any direction. */
+export function normalizeRect(rect: Rect): Rect {
+  return {
+    x: Math.min(rect.x, rect.x + rect.width),
+    y: Math.min(rect.y, rect.y + rect.height),
+    width: Math.abs(rect.width),
+    height: Math.abs(rect.height),
+  }
+}
+
+/**
+ * Works out a grid from a box the GM dragged across a known number of squares.
+ *
+ * This is the whole point of a calibration tool: nobody knows that their map is
+ * 63.4 pixels to the square, but anyone can drag a box around three squares
+ * they can see. The offset comes out as the phase of the box's own edge, so
+ * the grid lands on the lines already drawn on the art rather than near them.
+ */
+export function solveGrid(box: Rect, columns: number, rows: number): GridSolution | null {
+  const rect = normalizeRect(box)
+  const across = Math.max(1, Math.round(columns))
+  const down = Math.max(1, Math.round(rows))
+
+  const sizeX = rect.width / across
+  const sizeY = rect.height / down
+  // A box a few pixels across is a stray click, not a measurement.
+  if (!Number.isFinite(sizeX) || !Number.isFinite(sizeY) || sizeX < 4 || sizeY < 4) return null
+
+  const size = (sizeX + sizeY) / 2
+  const skew = Math.abs(sizeX - sizeY) / Math.max(sizeX, sizeY)
+
+  return {
+    size,
+    // Modulo can go negative when the box starts left of the origin.
+    offsetX: ((rect.x % size) + size) % size,
+    offsetY: ((rect.y % size) + size) % size,
+    skew,
+  }
+}

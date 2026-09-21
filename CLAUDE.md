@@ -77,6 +77,17 @@ pnpm dev             # the Cloudflare adapter, on :8787
 pnpm demo            # build the standalone demo
 ```
 
+## Two things that look like footguns but are deliberate
+
+- **pdf.js is the `legacy` build, loaded on demand.** The modern build calls
+  `Map.prototype.getOrInsertComputed`, which current Chromium does not have, so
+  it fails outright on browsers people actually use. It is also ~150 KB gzipped
+  and must stay out of the startup path — never import `pdf.ts` from a module
+  that loads at boot.
+- **Grid geometry is solved, not typed.** `solveGrid` in `view.ts` turns a
+  dragged box plus a square count into size and offset. If you find yourself
+  adding a numeric grid field to a panel, you are asking the wrong question.
+
 ## Conventions
 
 - **Validate at the edge, then trust the types.** Everything off the wire goes

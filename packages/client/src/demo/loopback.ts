@@ -127,6 +127,7 @@ export class LoopbackTransport implements Transport {
           result,
           visibility,
           seed: Math.floor(secureRandom() * 0xffffffff),
+          ...(message.color ? { color: message.color } : {}),
         },
       },
     ])
