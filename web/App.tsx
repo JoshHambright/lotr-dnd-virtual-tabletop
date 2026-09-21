@@ -152,6 +152,13 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
         </div>
       </header>
 
+      {client.demotedFromGm ? (
+        <div className="notice">
+          This browser’s GM key was not accepted for table <strong>{client.roomCode}</strong>, so you have joined as a
+          player. If you are the GM, reopen the table or paste the key you were given.
+        </div>
+      ) : null}
+
       {isGm && editingSceneId && editingSceneId !== room.activeSceneId ? (
         <div className="notice">
           You are staging <strong>{room.scenes[editingSceneId]?.name}</strong>. The table is still looking at{' '}

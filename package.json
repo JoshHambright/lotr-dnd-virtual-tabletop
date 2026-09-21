@@ -5,7 +5,9 @@
   "type": "module",
   "description": "A small realtime virtual tabletop for remote Middle-earth 5e games",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "build": "vite build",
@@ -20,13 +22,13 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250109.0",
+    "@cloudflare/workers-types": "^5.20260921.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "vitest": "^3.2.4",
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.135.0"
   }
 }

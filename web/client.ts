@@ -53,6 +53,11 @@ export class TableClient {
   #structuralVersion = 0
   #liveVersion = 0
 
+  /** Set when the server refused our GM key and we rejoined as a player. */
+  demotedFromGm = false
+  #usingGmKey: boolean
+  #openedOnce = false
+
   #pendingMoves = new Map<string, { x: number; y: number }>()
   #moveTimer: ReturnType<typeof setTimeout> | null = null
   #cursorTimer: ReturnType<typeof setTimeout> | null = null
@@ -61,8 +66,14 @@ export class TableClient {
   constructor(
     readonly roomCode: string,
     readonly name: string,
-    readonly gmKey: string | null,
-  ) {}
+    private gmKeyValue: string | null,
+  ) {
+    this.#usingGmKey = gmKeyValue !== null
+  }
+
+  get gmKey(): string | null {
+    return this.gmKeyValue
+  }
 
   // --- Subscription ----------------------------------------------------------
 
@@ -95,8 +106,8 @@ export class TableClient {
     this.#closedByUs = false
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     const params = new URLSearchParams({ name: this.name })
-    if (this.gmKey) {
-      params.set('key', this.gmKey)
+    if (this.#usingGmKey && this.gmKeyValue) {
+      params.set('key', this.gmKeyValue)
       params.set('role', 'gm')
     }
 
@@ -105,6 +116,7 @@ export class TableClient {
 
     socket.addEventListener('open', () => {
       this.#attempt = 0
+      this.#openedOnce = true
       this.status = 'open'
       this.lastError = null
       this.#heartbeat = setInterval(() => this.#send({ k: 'ping' }), HEARTBEAT_MS)
@@ -123,6 +135,20 @@ export class TableClient {
         this.#emit(true)
         return
       }
+      // A socket that never opened while we were presenting a GM key means
+      // the server refused the key — a stale one left in this browser from a
+      // table that has since been reopened. Rejoin as a player rather than
+      // locking someone out of their own game night.
+      if (!this.#openedOnce && this.#usingGmKey) {
+        this.#usingGmKey = false
+        this.gmKeyValue = null
+        this.demotedFromGm = true
+        this.status = 'connecting'
+        this.#emit(true)
+        this.connect()
+        return
+      }
+
       this.status = 'reconnecting'
       this.#emit(true)
       this.#scheduleReconnect()

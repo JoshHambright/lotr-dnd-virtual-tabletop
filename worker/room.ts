@@ -176,12 +176,19 @@ export class TableRoom {
   // --- Assets ----------------------------------------------------------------
 
   async #uploadAsset(request: Request, url: URL): Promise<Response> {
-    if (!this.#state) return respond({ error: 'No table with that code' }, 404)
-    if (!this.#isGm(url.searchParams.get('key'))) return respond({ error: 'Only the GM can upload' }, 403)
+    // Refusing an upload still has to consume the body the client is sending,
+    // or the runtime raises "can't read from request stream" behind the scenes.
+    const refuse = async (body: unknown, status: number): Promise<Response> => {
+      await request.body?.cancel().catch(() => {})
+      return respond(body, status)
+    }
+
+    if (!this.#state) return refuse({ error: 'No table with that code' }, 404)
+    if (!this.#isGm(url.searchParams.get('key'))) return refuse({ error: 'Only the GM can upload' }, 403)
 
     const type = request.headers.get('content-type') ?? 'application/octet-stream'
     if (!/^image\/(png|jpeg|webp|gif|avif)$/.test(type)) {
-      return respond({ error: 'Maps and portraits must be images' }, 415)
+      return refuse({ error: 'Maps and portraits must be images' }, 415)
     }
 
     const bytes = new Uint8Array(await request.arrayBuffer())
