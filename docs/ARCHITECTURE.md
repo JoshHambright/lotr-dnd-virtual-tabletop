@@ -30,7 +30,7 @@ costs nothing until a piece moves.
 `shared/state.ts` defines the room and a `reduce(state, op)` that advances it.
 The same reducer runs on the server and in every browser.
 
-The server is the authority. A client sends *intents*: move this token, roll
+The server is the authority. A client sends _intents_: move this token, roll
 this expression, save this sheet. The server validates, applies, and broadcasts.
 Clients replay the identical function to stay in step.
 
@@ -59,9 +59,9 @@ private rolls or whispers.
 **`projectOp`** translates one applied operation into what each role is told.
 Most pass through or vanish. Two change shape:
 
-- *Switching the active scene* expands into a teardown of the old scene, the new
+- _Switching the active scene_ expands into a teardown of the old scene, the new
   scene, and its visible tokens — a player has never seen the new one.
-- *Revealing a hidden token* becomes a `token.create`, and concealing one
+- _Revealing a hidden token_ becomes a `token.create`, and concealing one
   becomes a `token.delete`, because a player's copy never held the token at all.
   A flag they could flip would not be a secret.
 
@@ -69,7 +69,7 @@ A token that stays visible has its patch **re-derived from the sanitized token**
 rather than forwarded, so a concealed hit point total cannot slip through in a
 partial update.
 
-**`authorize`** returns a *rewritten operation* rather than a boolean. A player
+**`authorize`** returns a _rewritten operation_ rather than a boolean. A player
 editing a token gets a patch narrowed to damage and conditions; a player saving
 a sheet gets ownership taken from their connection rather than the payload, and
 the GM's private notes preserved. Returning the op means a caller cannot forget
@@ -83,7 +83,7 @@ times a second, and reconciling a component tree that often would spend the
 frame budget on reconciliation.
 
 The client exposes two subscription channels. React panels listen on the
-*structural* one, which token moves and cursors do not touch. The canvas reads
+_structural_ one, which token moves and cursors do not touch. The canvas reads
 live.
 
 Fog is drawn by painting the mask into an offscreen canvas one pixel per cell

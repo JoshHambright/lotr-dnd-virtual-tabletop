@@ -111,7 +111,9 @@ export class TableClient {
       params.set('role', 'gm')
     }
 
-    const socket = new WebSocket(`${protocol}://${location.host}/api/room/${encodeURIComponent(this.roomCode)}/ws?${params}`)
+    const socket = new WebSocket(
+      `${protocol}://${location.host}/api/room/${encodeURIComponent(this.roomCode)}/ws?${params}`,
+    )
     this.#socket = socket
 
     socket.addEventListener('open', () => {

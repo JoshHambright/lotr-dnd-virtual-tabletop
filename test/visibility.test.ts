@@ -6,18 +6,61 @@ import { authorize, projectOpForPlayer, projectStateForPlayer } from '../shared/
 /** A table mid-session: one scene live, one staged, and an ambush waiting. */
 function table(): RoomState {
   const ops: Op[] = [
-    { t: 'scene.create', scene: { ...newScene('live', 'The Prancing Pony', 640, 640, 'asset-live'), gmNotes: 'Strider watches from the corner' } },
-    { t: 'scene.create', scene: { ...newScene('staged', 'Weathertop, night', 640, 640, 'asset-staged'), gmNotes: 'Five Nazgûl arrive on turn 3' } },
+    {
+      t: 'scene.create',
+      scene: {
+        ...newScene('live', 'The Prancing Pony', 640, 640, 'asset-live'),
+        gmNotes: 'Strider watches from the corner',
+      },
+    },
+    {
+      t: 'scene.create',
+      scene: {
+        ...newScene('staged', 'Weathertop, night', 640, 640, 'asset-staged'),
+        gmNotes: 'Five Nazgûl arrive on turn 3',
+      },
+    },
     { t: 'scene.setActive', id: 'live' },
     { t: 'token.create', token: newToken('frodo', 'live', 70, 70, { label: 'Frodo', characterId: 'c-frodo' }) },
-    { t: 'token.create', token: newToken('lurker', 'live', 200, 200, { label: 'Bill Ferny', hidden: true, statBlockId: 'sb-spy' }) },
+    {
+      t: 'token.create',
+      token: newToken('lurker', 'live', 200, 200, { label: 'Bill Ferny', hidden: true, statBlockId: 'sb-spy' }),
+    },
     { t: 'token.create', token: newToken('wraith', 'staged', 10, 10, { label: 'Nazgûl' }) },
     { t: 'statblock.upsert', statBlock: newStatBlock('sb-spy', 'Bill Ferny') },
     { t: 'encounter.upsert', encounter: { id: 'e1', name: 'Ambush at Weathertop', notes: 'secret', members: [] } },
-    { t: 'character.upsert', character: { ...newCharacter('c-frodo', 'Frodo', 'Josh'), gmNotes: 'Bearing the Ring; tempt him' } },
-    { t: 'roll.add', roll: { id: 'r1', at: 1, by: 'GM', label: 'Ambush', result: { expression: '1d20', mode: 'normal', terms: [], total: 12 }, visibility: 'gm', seed: 1 } },
-    { t: 'roll.add', roll: { id: 'r2', at: 2, by: 'Josh', label: 'Perception', result: { expression: '1d20', mode: 'normal', terms: [], total: 18 }, visibility: 'public', seed: 2 } },
-    { t: 'chat.add', message: { id: 'm1', at: 1, by: 'GM', text: 'rolling initiative behind the screen', visibility: 'gm' } },
+    {
+      t: 'character.upsert',
+      character: { ...newCharacter('c-frodo', 'Frodo', 'Josh'), gmNotes: 'Bearing the Ring; tempt him' },
+    },
+    {
+      t: 'roll.add',
+      roll: {
+        id: 'r1',
+        at: 1,
+        by: 'GM',
+        label: 'Ambush',
+        result: { expression: '1d20', mode: 'normal', terms: [], total: 12 },
+        visibility: 'gm',
+        seed: 1,
+      },
+    },
+    {
+      t: 'roll.add',
+      roll: {
+        id: 'r2',
+        at: 2,
+        by: 'Josh',
+        label: 'Perception',
+        result: { expression: '1d20', mode: 'normal', terms: [], total: 18 },
+        visibility: 'public',
+        seed: 2,
+      },
+    },
+    {
+      t: 'chat.add',
+      message: { id: 'm1', at: 1, by: 'GM', text: 'rolling initiative behind the screen', visibility: 'gm' },
+    },
   ]
   return ops.reduce(reduce, emptyRoom('Fellowship'))
 }
@@ -63,7 +106,10 @@ describe('what a player is sent', () => {
 
   it('hides hit points on a token whose totals the GM is keeping back', () => {
     let state = table()
-    state = reduce(state, { t: 'token.create', token: newToken('orc', 'live', 300, 300, { label: 'Orc', hp: 7, maxHp: 11, showHpToPlayers: false }) })
+    state = reduce(state, {
+      t: 'token.create',
+      token: newToken('orc', 'live', 300, 300, { label: 'Orc', hp: 7, maxHp: 11, showHpToPlayers: false }),
+    })
     const token = projectStateForPlayer(state).tokens['orc']
     expect(token).toMatchObject({ label: 'Orc', hp: null, maxHp: null })
   })
@@ -99,7 +145,10 @@ describe('what a player is told changed', () => {
 
   it('re-derives a visible token’s patch so concealed hit points cannot slip through', () => {
     let before = table()
-    before = reduce(before, { t: 'token.create', token: newToken('orc', 'live', 10, 10, { hp: 7, maxHp: 11, showHpToPlayers: false }) })
+    before = reduce(before, {
+      t: 'token.create',
+      token: newToken('orc', 'live', 10, 10, { hp: 7, maxHp: 11, showHpToPlayers: false }),
+    })
     const op: Op = { t: 'token.update', id: 'orc', patch: { hp: 3 } }
     const [projected] = projectOpForPlayer(op, before, reduce(before, op))
     expect(projected).toMatchObject({ t: 'token.update', patch: { hp: null, maxHp: null } })
@@ -143,7 +192,18 @@ describe('what a player is told changed', () => {
 
   it('withholds a roll the GM made behind the screen', () => {
     const before = table()
-    const op: Op = { t: 'roll.add', roll: { id: 'r3', at: 3, by: 'GM', label: '', result: { expression: '1d20', mode: 'normal', terms: [], total: 4 }, visibility: 'gm', seed: 3 } }
+    const op: Op = {
+      t: 'roll.add',
+      roll: {
+        id: 'r3',
+        at: 3,
+        by: 'GM',
+        label: '',
+        result: { expression: '1d20', mode: 'normal', terms: [], total: 4 },
+        visibility: 'gm',
+        seed: 3,
+      },
+    }
     expect(projectOpForPlayer(op, before, reduce(before, op))).toEqual([])
   })
 })
@@ -183,7 +243,11 @@ describe('what a player may do', () => {
 
   it('narrows a token update to damage and conditions', () => {
     const decision = authorize(
-      { t: 'token.update', id: 'frodo', patch: { conditions: ['Weary'], hidden: true, statBlockId: 'sb-spy', label: 'Sauron' } },
+      {
+        t: 'token.update',
+        id: 'frodo',
+        patch: { conditions: ['Weary'], hidden: true, statBlockId: 'sb-spy', label: 'Sauron' },
+      },
       table(),
       josh,
     )
@@ -197,7 +261,10 @@ describe('what a player may do', () => {
 
   it('drops a hit point edit on a token whose totals are concealed', () => {
     let state = table()
-    state = reduce(state, { t: 'token.create', token: newToken('orc', 'live', 10, 10, { hp: 7, showHpToPlayers: false }) })
+    state = reduce(state, {
+      t: 'token.create',
+      token: newToken('orc', 'live', 10, 10, { hp: 7, showHpToPlayers: false }),
+    })
     const decision = authorize({ t: 'token.update', id: 'orc', patch: { hp: 0 } }, state, josh)
     expect(decision).toMatchObject({ ok: true, op: { patch: {} } })
   })
@@ -214,7 +281,10 @@ describe('what a player may do', () => {
   it('forces a player-made token to be visible and unlinked', () => {
     const state = reduce(table(), { t: 'settings.update', patch: { playersCanCreateTokens: true } })
     const decision = authorize(
-      { t: 'token.create', token: newToken('new', 'live', 0, 0, { hidden: true, statBlockId: 'sb-spy', locked: true }) },
+      {
+        t: 'token.create',
+        token: newToken('new', 'live', 0, 0, { hidden: true, statBlockId: 'sb-spy', locked: true }),
+      },
       state,
       josh,
     )
@@ -245,6 +315,86 @@ describe('what a player may do', () => {
       sam,
     )
     expect(decision).toMatchObject({ ok: true, op: { character: { ownerName: 'Sam' } } })
+  })
+
+  it('refuses to create a token on a scene that is not on the table', () => {
+    const state = reduce(table(), { t: 'settings.update', patch: { playersCanCreateTokens: true } })
+    expect(authorize({ t: 'token.create', token: newToken('x', 'staged', 0, 0) }, state, josh)).toMatchObject({
+      ok: false,
+    })
+  })
+
+  it('refuses to delete a token that is the GM’s', () => {
+    let state = reduce(table(), { t: 'settings.update', patch: { playersCanCreateTokens: true } })
+    state = reduce(state, { t: 'token.create', token: newToken('mine', 'live', 0, 0) })
+    state = reduce(state, { t: 'token.create', token: newToken('gm-locked', 'live', 0, 0, { locked: true }) })
+    state = reduce(state, { t: 'token.create', token: newToken('gm-linked', 'live', 0, 0, { statBlockId: 'sb-spy' }) })
+
+    expect(authorize({ t: 'token.delete', id: 'mine' }, state, josh).ok).toBe(true)
+    expect(authorize({ t: 'token.delete', id: 'gm-locked' }, state, josh)).toMatchObject({ ok: false })
+    expect(authorize({ t: 'token.delete', id: 'gm-linked' }, state, josh)).toMatchObject({ ok: false })
+  })
+
+  it('refuses to delete a token that is not on the table', () => {
+    const state = reduce(table(), { t: 'settings.update', patch: { playersCanCreateTokens: true } })
+    expect(authorize({ t: 'token.delete', id: 'lurker' }, state, josh)).toMatchObject({ ok: false })
+  })
+
+  it('refuses to delete a sheet that does not exist', () => {
+    expect(authorize({ t: 'character.delete', id: 'nobody' }, table(), josh)).toMatchObject({ ok: false })
+  })
+
+  it('refuses to move a token whose owning character belongs to someone else', () => {
+    let state = reduce(table(), { t: 'settings.update', patch: { playersCanMoveAnyToken: false } })
+    state = reduce(state, { t: 'token.create', token: newToken('orphan', 'live', 0, 0) })
+    // A token linked to no sheet is nobody's when free movement is off.
+    expect(authorize({ t: 'token.move', id: 'orphan', x: 1, y: 1 }, state, josh)).toMatchObject({ ok: false })
+  })
+
+  it('projects a scene update on the live scene with GM notes stripped out', () => {
+    const before = table()
+    const op: Op = { t: 'scene.update', id: 'live', patch: { name: 'The Common Room', gmNotes: 'SECRET' } }
+    const ops = projectOpForPlayer(op, before, reduce(before, op))
+    expect(ops).toEqual([{ t: 'scene.update', id: 'live', patch: { name: 'The Common Room' } }])
+  })
+
+  it('says nothing when a scene update carries only GM notes', () => {
+    const before = table()
+    const op: Op = { t: 'scene.update', id: 'live', patch: { gmNotes: 'SECRET' } }
+    expect(projectOpForPlayer(op, before, reduce(before, op))).toEqual([])
+  })
+
+  it('passes a settings change through to players', () => {
+    const before = table()
+    const op: Op = { t: 'settings.update', patch: { playersCanMoveAnyToken: false } }
+    expect(projectOpForPlayer(op, before, reduce(before, op))).toEqual([op])
+  })
+
+  it('tells players when the live scene is deleted, and not about others', () => {
+    const before = table()
+    const live: Op = { t: 'scene.delete', id: 'live' }
+    expect(projectOpForPlayer(live, before, reduce(before, live))).toEqual([live])
+    const staged: Op = { t: 'scene.delete', id: 'staged' }
+    expect(projectOpForPlayer(staged, before, reduce(before, staged))).toEqual([])
+  })
+
+  it('passes a sheet deletion through', () => {
+    const before = table()
+    const op: Op = { t: 'character.delete', id: 'c-frodo' }
+    expect(projectOpForPlayer(op, before, reduce(before, op))).toEqual([op])
+  })
+
+  it('says nothing when the active scene is set to what it already was', () => {
+    const before = table()
+    const op: Op = { t: 'scene.setActive', id: 'live' }
+    expect(projectOpForPlayer(op, before, reduce(before, op))).toEqual([])
+  })
+
+  it('tears the table down when the GM clears the active scene', () => {
+    const before = table()
+    const op: Op = { t: 'scene.setActive', id: null }
+    const ops = projectOpForPlayer(op, before, reduce(before, op))
+    expect(ops.map((o) => o.t)).toEqual(['scene.delete', 'scene.setActive'])
   })
 
   it('refuses everything structural', () => {

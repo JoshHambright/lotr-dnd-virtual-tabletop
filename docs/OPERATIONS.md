@@ -14,10 +14,10 @@ docker compose up -d
 
 Two volumes hold everything that matters:
 
-| Volume | Holds |
-|---|---|
-| `./data/db` | SQLite: tables, sheets, bestiary, rolls |
-| `./data/assets` | Map images, content-addressed by hash |
+| Volume          | Holds                                   |
+| --------------- | --------------------------------------- |
+| `./data/db`     | SQLite: tables, sheets, bestiary, rolls |
+| `./data/assets` | Map images, content-addressed by hash   |
 
 ## Reaching it from outside the house
 

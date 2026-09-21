@@ -73,7 +73,9 @@ h3 {
   border-radius: var(--radius);
   padding: 0.45em 0.8em;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .button:hover:not(:disabled),

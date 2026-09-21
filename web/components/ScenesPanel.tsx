@@ -195,11 +195,19 @@ function SceneEditor({
         </div>
         <div className="panel__actions">
           <label className="checkbox">
-            <input type="checkbox" checked={scene.grid.visible} onChange={(event) => patchGrid({ visible: event.target.checked })} />
+            <input
+              type="checkbox"
+              checked={scene.grid.visible}
+              onChange={(event) => patchGrid({ visible: event.target.checked })}
+            />
             Show grid
           </label>
           <label className="checkbox">
-            <input type="checkbox" checked={scene.grid.snap} onChange={(event) => patchGrid({ snap: event.target.checked })} />
+            <input
+              type="checkbox"
+              checked={scene.grid.snap}
+              onChange={(event) => patchGrid({ snap: event.target.checked })}
+            />
             Snap tokens (hold Alt to override)
           </label>
         </div>
@@ -217,10 +225,18 @@ function SceneEditor({
         </label>
         <p className="hint">{explored}% uncovered</p>
         <div className="panel__actions">
-          <button type="button" className="button button--small" onClick={() => client.send({ t: 'fog.setAll', sceneId: scene.id, revealed: true })}>
+          <button
+            type="button"
+            className="button button--small"
+            onClick={() => client.send({ t: 'fog.setAll', sceneId: scene.id, revealed: true })}
+          >
             Reveal all
           </button>
-          <button type="button" className="button button--small" onClick={() => client.send({ t: 'fog.setAll', sceneId: scene.id, revealed: false })}>
+          <button
+            type="button"
+            className="button button--small"
+            onClick={() => client.send({ t: 'fog.setAll', sceneId: scene.id, revealed: false })}
+          >
             Cover all
           </button>
         </div>
@@ -278,7 +294,12 @@ function SceneEditor({
             </button>
           </>
         ) : (
-          <button type="button" className="button button--small" disabled={isActive} onClick={() => setConfirmingDelete(true)}>
+          <button
+            type="button"
+            className="button button--small"
+            disabled={isActive}
+            onClick={() => setConfirmingDelete(true)}
+          >
             {isActive ? 'On the table' : 'Delete map'}
           </button>
         )}

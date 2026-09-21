@@ -4,4 +4,9 @@ import { App } from './App.js'
 import './styles.css'
 
 const root = document.getElementById('root')
-if (root) createRoot(root).render(<StrictMode><App /></StrictMode>)
+if (root)
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )

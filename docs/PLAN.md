@@ -10,12 +10,12 @@ one host, which is what this plan changes.
 
 ## The four decisions this plan is built on
 
-| Decision | Choice | Why |
-|---|---|---|
-| Stack | Node/TypeScript + WebSockets, Docker-first | Keeps 4,690 lines of tested core and UI. Only 562 lines were Cloudflare-specific. |
-| Hosting | Josh hosts on a local machine, reached through a tunnel | The GM is a *user*, not an operator. Ops docs are written for Josh. |
-| Rulesets | Pack system built now, all three | Retrofitting would mean rewriting the sheet model, dice semantics and theming. |
-| Content | Bundle open content where licensed | 5e SRD is CC-BY. MÖRK BORG has a third-party license. LotR 5e has neither. |
+| Decision | Choice                                                  | Why                                                                               |
+| -------- | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Stack    | Node/TypeScript + WebSockets, Docker-first              | Keeps 4,690 lines of tested core and UI. Only 562 lines were Cloudflare-specific. |
+| Hosting  | Josh hosts on a local machine, reached through a tunnel | The GM is a _user_, not an operator. Ops docs are written for Josh.               |
+| Rulesets | Pack system built now, all three                        | Retrofitting would mean rewriting the sheet model, dice semantics and theming.    |
+| Content  | Bundle open content where licensed                      | 5e SRD is CC-BY. MÖRK BORG has a third-party license. LotR 5e has neither.        |
 
 Recorded with fuller reasoning in [DECISIONS.md](DECISIONS.md).
 
@@ -84,7 +84,7 @@ the strongest practical argument for doing this now.
 
 ## Phases
 
-### Phase 0 — Foundations and quality gates *(serial, small, blocking)*
+### Phase 0 — Foundations and quality gates _(serial, small, blocking)_
 
 Nothing parallel starts until this lands, because everything else codes against
 the contracts frozen here.
@@ -100,16 +100,16 @@ the contracts frozen here.
 Exit: CI green on an empty-feature branch; every contract file has a spec doc
 and a type; `pnpm verify` passes from a clean clone.
 
-### Phase 1 — Parallel build *(six independent workstreams)*
+### Phase 1 — Parallel build _(six independent workstreams)_
 
-| ID | Workstream | Owns | Depends on |
-|---|---|---|---|
-| A | Node server | `packages/server` — Fastify, ws, room actors, SQLite, assets | protocol, core |
-| B | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `srd5e` pack | pack contract |
-| C | Dynamic sheet | `client/sheet/**` — renders any SheetSchema | pack contract |
-| D | Theming | `client/theme/**` + three skins | theme token contract |
-| E | Docker & ops | `infra/**` + operations docs | nothing |
-| F | Test harness | multi-client e2e against the Node server | protocol |
+| ID  | Workstream     | Owns                                                                                          | Depends on           |
+| --- | -------------- | --------------------------------------------------------------------------------------------- | -------------------- |
+| A   | Node server    | `packages/server` — Fastify, ws, room actors, SQLite, assets                                  | protocol, core       |
+| B   | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `srd5e` pack | pack contract        |
+| C   | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                   | pack contract        |
+| D   | Theming        | `client/theme/**` + three skins                                                               | theme token contract |
+| E   | Docker & ops   | `infra/**` + operations docs                                                                  | nothing              |
+| F   | Test harness   | multi-client e2e against the Node server                                                      | protocol             |
 
 These touch disjoint directories on purpose. The contracts frozen in Phase 0 are
 what let six agents work without stepping on each other.
@@ -131,8 +131,8 @@ app and reshapes the sheets.
 ### Phase 3 — Hardening for real sessions
 
 - Reconnection tested against genuine network loss, not a clean socket close
-- Backup and restore; export a table as JSON *(the gap flagged in the
-  prototype's hosting notes)*
+- Backup and restore; export a table as JSON _(the gap flagged in the
+  prototype's hosting notes)_
 - Rate limiting, message size caps, abuse resistance on a public tunnel
 - Load check: six clients, sustained token dragging, a large map
 - Accessibility pass: keyboard navigation, focus order, contrast in all three skins
@@ -149,15 +149,15 @@ Exit: a full session played on it without anyone noticing the software.
 
 Every gate runs in CI on every push, and every one of them blocks merge.
 
-| Gate | Threshold |
-|---|---|
-| Typecheck | `tsc --noEmit`, strict, `exactOptionalPropertyTypes` |
-| Lint & format | eslint + prettier, zero warnings |
-| Unit tests | vitest; **90% line coverage on `packages/core`**, 70% overall |
+| Gate            | Threshold                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Typecheck       | `tsc --noEmit`, strict, `exactOptionalPropertyTypes`                                                                            |
+| Lint & format   | eslint + prettier, zero warnings                                                                                                |
+| Unit tests      | vitest; **90% line coverage on `packages/core`**, 70% overall                                                                   |
 | Leak assertions | the e2e suite that plants marked secrets and proves none reach a player socket — **non-negotiable, treated as a security test** |
-| Docker | image builds; `compose up` passes a healthcheck |
-| Dependencies | `npm audit` clean of high and critical |
-| Static analysis | CodeQL on JS/TS |
+| Docker          | image builds; `compose up` passes a healthcheck                                                                                 |
+| Dependencies    | `npm audit` clean of high and critical                                                                                          |
+| Static analysis | CodeQL on JS/TS                                                                                                                 |
 
 Pack authoring gets its own gate: every pack must validate against the schema
 and every formula in it must parse, so a malformed pack fails CI rather than a

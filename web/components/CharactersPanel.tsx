@@ -54,14 +54,23 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
           const isMine = character.ownerName === client.name
           return (
             <li key={character.id} className={character.id === openId ? 'scene-list__item--editing' : undefined}>
-              <button type="button" className="scene-list__name" onClick={() => onOpen(character.id === openId ? null : character.id)}>
+              <button
+                type="button"
+                className="scene-list__name"
+                onClick={() => onOpen(character.id === openId ? null : character.id)}
+              >
                 {character.name}
                 <span className="hint">
                   {[character.culture, character.calling].filter(Boolean).join(' · ') || 'Unwritten'}
                   {isMine ? ' · yours' : ` · ${character.ownerName}`}
                 </span>
               </button>
-              <button type="button" className="button button--small" disabled={!scene} onClick={() => placeOnMap(character)}>
+              <button
+                type="button"
+                className="button button--small"
+                disabled={!scene}
+                onClick={() => placeOnMap(character)}
+              >
                 To map
               </button>
             </li>
@@ -72,7 +81,11 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
 
       {open ? (
         <>
-          <CharacterSheet client={client} character={open} editable={client.role === 'gm' || open.ownerName === client.name} />
+          <CharacterSheet
+            client={client}
+            character={open}
+            editable={client.role === 'gm' || open.ownerName === client.name}
+          />
           {client.role === 'gm' || open.ownerName === client.name ? (
             <button
               type="button"

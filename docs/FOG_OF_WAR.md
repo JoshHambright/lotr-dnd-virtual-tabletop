@@ -17,7 +17,7 @@ covered cells. There is no "fog: off" for a player to flip, because their
 browser holds no information about the hidden ground beyond its shape.
 
 The GM sees the covered area as a translucent slate veil and can work through
-it. Players get an opaque wall. The GM's *see it as players do* toggle renders
+it. Players get an opaque wall. The GM's _see it as players do_ toggle renders
 the player's version so you can check what the table is actually looking at
 before you describe it.
 
@@ -32,7 +32,7 @@ edge.
 picture and then covers part of it. Someone who opens devtools, or reads the
 network tab, can look at the parts their character hasn't reached.
 
-This is worth being clear about because the *other* secrets have no such gap.
+This is worth being clear about because the _other_ secrets have no such gap.
 Hidden tokens, bestiary entries, encounters, GM notes on scenes and sheets,
 private rolls, and maps that aren't on the table are never transmitted to a
 player at all — not obscured, not flagged, absent. Those are enforced in

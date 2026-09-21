@@ -34,14 +34,24 @@ interface Die {
 
 export function DiceTray({ roll, nonce }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [visible, setVisible] = useState(false)
+  const [dismissedNonce, setDismissedNonce] = useState<number | null>(null)
+  const [shownNonce, setShownNonce] = useState(nonce)
+
+  // Adjusting state while rendering is how React wants a prop change handled;
+  // doing it in an effect would cascade an extra render for every roll.
+  if (nonce !== shownNonce) {
+    setShownNonce(nonce)
+    setDismissedNonce(null)
+  }
+
+  const visible = Boolean(roll) && dismissedNonce !== nonce
 
   useEffect(() => {
-    if (!roll) return
-    setVisible(true)
-    const timer = setTimeout(() => setVisible(false), TUMBLE_MS + SETTLE_MS + HOLD_MS)
+    if (!roll || !visible) return
+    // Setting state from a timer is asynchronous, so it does not cascade.
+    const timer = setTimeout(() => setDismissedNonce(nonce), TUMBLE_MS + SETTLE_MS + HOLD_MS)
     return () => clearTimeout(timer)
-  }, [roll, nonce])
+  }, [roll, nonce, visible])
 
   const dice = useMemo(() => (roll ? layOutDice(roll) : []), [roll])
 
@@ -103,7 +113,10 @@ export function DiceTray({ roll, nonce }: Props) {
   const critical = criticalKind(roll.result)
 
   return (
-    <div className={`dice-tray${roll.visibility === 'gm' ? ' dice-tray--private' : ''}`} onClick={() => setVisible(false)}>
+    <div
+      className={`dice-tray${roll.visibility === 'gm' ? ' dice-tray--private' : ''}`}
+      onClick={() => setDismissedNonce(nonce)}
+    >
       <div className="dice-tray__header">
         <strong>{roll.by}</strong>
         {roll.label ? <span className="dice-tray__label">{roll.label}</span> : null}

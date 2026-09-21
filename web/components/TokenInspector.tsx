@@ -4,7 +4,17 @@ import type { Character, Scene, StatBlock, Token } from '../../shared/state.js'
 import { TOKEN_COLORS } from '../../shared/state.js'
 import type { TableClient } from '../client.js'
 
-const CONDITIONS = ['Weary', 'Miserable', 'Poisoned', 'Prone', 'Frightened', 'Grappled', 'Restrained', 'Stunned', 'Blinded']
+const CONDITIONS = [
+  'Weary',
+  'Miserable',
+  'Poisoned',
+  'Prone',
+  'Frightened',
+  'Grappled',
+  'Restrained',
+  'Stunned',
+  'Blinded',
+]
 
 interface Props {
   client: TableClient
@@ -34,7 +44,12 @@ export function TokenInspector({ client, token, statBlock, character, onOpenStat
         <>
           <div className="field">
             <label htmlFor="token-label">Label</label>
-            <input id="token-label" className="input" value={token.label} onChange={(event) => patch({ label: event.target.value })} />
+            <input
+              id="token-label"
+              className="input"
+              value={token.label}
+              onChange={(event) => patch({ label: event.target.value })}
+            />
           </div>
 
           <div className="sheet__grid">
@@ -84,11 +99,19 @@ export function TokenInspector({ client, token, statBlock, character, onOpenStat
 
           <div className="panel__actions">
             <label className="checkbox">
-              <input type="checkbox" checked={token.hidden} onChange={(event) => patch({ hidden: event.target.checked })} />
+              <input
+                type="checkbox"
+                checked={token.hidden}
+                onChange={(event) => patch({ hidden: event.target.checked })}
+              />
               Hidden from players
             </label>
             <label className="checkbox">
-              <input type="checkbox" checked={token.locked} onChange={(event) => patch({ locked: event.target.checked })} />
+              <input
+                type="checkbox"
+                checked={token.locked}
+                onChange={(event) => patch({ locked: event.target.checked })}
+              />
               Players cannot move it
             </label>
             <label className="checkbox">
@@ -132,7 +155,11 @@ export function TokenInspector({ client, token, statBlock, character, onOpenStat
       {character ? <p className="hint">Sheet: {character.name}</p> : null}
 
       {isGm ? (
-        <button type="button" className="button button--danger button--small" onClick={() => client.send({ t: 'token.delete', id: token.id })}>
+        <button
+          type="button"
+          className="button button--danger button--small"
+          onClick={() => client.send({ t: 'token.delete', id: token.id })}
+        >
           Remove from map
         </button>
       ) : null}

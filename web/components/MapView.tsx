@@ -56,7 +56,10 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
   const viewRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef<DragState | null>(null)
   const fogLayerRef = useRef<FogLayer | null>(null)
-  const [measurement, setMeasurement] = useState<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null)
+  const [measurement, setMeasurement] = useState<{
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+  } | null>(null)
   const [fitted, setFitted] = useState<string | null>(null)
 
   const asPlayer = client.role === 'player' || previewAsPlayer
@@ -145,7 +148,13 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
       // Middle or right button pans, whatever tool is selected — so the GM
       // can reposition the map mid-brushstroke without switching tools.
       if (event.button === 1 || event.button === 2) {
-        dragRef.current = { kind: 'pan', fromX: event.clientX, fromY: event.clientY, lastX: event.clientX, lastY: event.clientY }
+        dragRef.current = {
+          kind: 'pan',
+          fromX: event.clientX,
+          fromY: event.clientY,
+          lastX: event.clientX,
+          lastY: event.clientY,
+        }
         return
       }
 
@@ -179,7 +188,13 @@ export function MapView({ client, scene, tool, brushRadius, previewAsPlayer, sel
       }
 
       onSelectToken(null)
-      dragRef.current = { kind: 'pan', fromX: event.clientX, fromY: event.clientY, lastX: event.clientX, lastY: event.clientY }
+      dragRef.current = {
+        kind: 'pan',
+        fromX: event.clientX,
+        fromY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
+      }
     },
     [brushRadius, client, onSelectToken, pointToMap, scene, tool],
   )

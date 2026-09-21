@@ -11,18 +11,18 @@ against it at once.
 
 ```ts
 interface RulesetPack {
-  id: string                    // 'srd5e' | 'lotr5e' | 'morkborg'
-  name: string                  // shown when creating a table
-  version: string               // semver; bumped when the schema changes
+  id: string // 'srd5e' | 'lotr5e' | 'morkborg'
+  name: string // shown when creating a table
+  version: string // semver; bumped when the schema changes
   summary: string
 
-  licence: Licence              // rendered in-app; never optional
+  licence: Licence // rendered in-app; never optional
   theme: ThemeTokens
   dice: DiceProfile
   sheet: SheetSchema
   conditions: Condition[]
   tokenDefaults: TokenDefaults
-  content?: ContentIndex        // optional bundled monsters, spells, gear
+  content?: ContentIndex // optional bundled monsters, spells, gear
 }
 ```
 
@@ -33,12 +33,12 @@ of the three packs require attribution as a condition of use.
 
 ```ts
 interface Licence {
-  name: string                  // 'CC-BY-4.0' | 'MÖRK BORG Third Party License' | 'Unofficial — structure only'
+  name: string // 'CC-BY-4.0' | 'MÖRK BORG Third Party License' | 'Unofficial — structure only'
   url?: string
   /** Verbatim text the licence obliges us to display. Shown in the About panel. */
   notice: string
   /** True when the licence grants use of a compatibility logo we ship. */
-  compatibilityLogo?: string    // asset path
+  compatibilityLogo?: string // asset path
 }
 ```
 
@@ -51,7 +51,7 @@ and no conditional class names in components.
 ```ts
 interface ThemeTokens {
   /** CSS custom properties, without the leading '--'. */
-  colors: Record<string, string>     // ink, surface, raised, rule, accent, danger…
+  colors: Record<string, string> // ink, surface, raised, rule, accent, danger…
   fonts: { display: string; body: string; mono: string }
   /** Openly licensed font families to load. We ship no commercial typefaces. */
   webfonts?: { family: string; href: string }[]
@@ -85,8 +85,8 @@ interface DiceProfile {
   advantageBonus?: number
 
   /** Target-number model. 5e compares to a DC; MÖRK BORG to a DR. */
-  targetLabel: string           // 'DC' | 'DR'
-  defaultTarget?: number        // MÖRK BORG: 12
+  targetLabel: string // 'DC' | 'DR'
+  defaultTarget?: number // MÖRK BORG: 12
 
   /** Faces that read as a critical success or failure, if any. */
   criticalSuccess?: number[]
@@ -103,7 +103,7 @@ interface DiceProfile {
 }
 
 interface RollModifier {
-  id: string                    // 'weary'
+  id: string // 'weary'
   label: string
   /** Applies when this sheet field is truthy. */
   whenField: string
@@ -135,19 +135,30 @@ interface Section {
 }
 
 type Field =
-  | { kind: 'text';      key: string; label: string; placeholder?: string }
-  | { kind: 'longtext';  key: string; label: string }
-  | { kind: 'number';    key: string; label: string; min?: number; max?: number; derived?: Formula }
-  | { kind: 'toggle';    key: string; label: string }
-  | { kind: 'select';    key: string; label: string; options: string[]; allowCustom: boolean }
+  | { kind: 'text'; key: string; label: string; placeholder?: string }
+  | { kind: 'longtext'; key: string; label: string }
+  | { kind: 'number'; key: string; label: string; min?: number; max?: number; derived?: Formula }
+  | { kind: 'toggle'; key: string; label: string }
+  | { kind: 'select'; key: string; label: string; options: string[]; allowCustom: boolean }
 
   /** A block of scores with modifiers and a roll button each. */
-  | { kind: 'abilityBlock'; key: string; abilities: { key: string; label: string }[]
-      modifier: Formula; roll?: RollMacro }
+  | {
+      kind: 'abilityBlock'
+      key: string
+      abilities: { key: string; label: string }[]
+      modifier: Formula
+      roll?: RollMacro
+    }
 
   /** A proficiency-ranked list. 5e has one; MÖRK BORG has none. */
-  | { kind: 'skillList'; key: string; skills: { key: string; label: string; ability: string }[]
-      ranks: number; modifier: Formula; roll?: RollMacro }
+  | {
+      kind: 'skillList'
+      key: string
+      skills: { key: string; label: string; ability: string }[]
+      ranks: number
+      modifier: Formula
+      roll?: RollMacro
+    }
 
   /** Current/maximum pair: hit points, Hope, Omens. */
   | { kind: 'track'; key: string; label: string; max?: Formula; resetOn?: string }
@@ -164,9 +175,9 @@ fixed LotR-shaped interface.
 
 ```ts
 interface RollMacro {
-  label: string                 // '{name} — {field.label}'
+  label: string // '{name} — {field.label}'
   /** Dice template; '@' references resolve against sheet values. */
-  expression: string            // '1d20 + @mod' | '1d20 + @abilities.agility'
+  expression: string // '1d20 + @mod' | '1d20 + @abilities.agility'
   visibility?: 'public' | 'gm'
 }
 ```
@@ -238,8 +249,8 @@ ability` against a **DR** rather than a DC, no skill list at all, Omens as a
 track, armour as a damage-reduction die. Black-and-yellow brutalist skin with a
 xerox texture.
 
-*Class-specific details — the Omens die in particular — go in as pack data and
-should be checked against the book by whoever runs it.*
+_Class-specific details — the Omens die in particular — go in as pack data and
+should be checked against the book by whoever runs it._
 
 The family (CY_BORG, Pirate Borg, Vast Grimm) each have their own third-party
 licences and are later packs, not assumptions baked in now.

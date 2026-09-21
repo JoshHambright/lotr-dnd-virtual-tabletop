@@ -56,7 +56,10 @@ export function generateRoomCode(random: () => number = Math.random): string {
 }
 
 export function normalizeRoomCode(input: string): string {
-  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
 }
 
 export function isValidRoomCode(input: string): boolean {

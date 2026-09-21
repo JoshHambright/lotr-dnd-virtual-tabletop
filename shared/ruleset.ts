@@ -17,14 +17,7 @@ export const HEROIC_CULTURES = [
   'Rangers of the North',
 ] as const
 
-export const CALLINGS = [
-  'Captain',
-  'Champion',
-  'Messenger',
-  'Scholar',
-  'Treasure Hunter',
-  'Warden',
-] as const
+export const CALLINGS = ['Captain', 'Champion', 'Messenger', 'Scholar', 'Treasure Hunter', 'Warden'] as const
 
 /** Each Calling has its own Shadow path — how the character frays under strain. */
 export const SHADOW_PATHS: Record<string, string> = {
@@ -36,13 +29,7 @@ export const SHADOW_PATHS: Record<string, string> = {
   Warden: 'Curse of Vengeance',
 }
 
-export const STANDARDS_OF_LIVING = [
-  'Poor',
-  'Frugal',
-  'Martial',
-  'Prosperous',
-  'Rich',
-] as const
+export const STANDARDS_OF_LIVING = ['Poor', 'Frugal', 'Martial', 'Prosperous', 'Rich'] as const
 
 /** Roles taken up while the company is on the road. */
 export const JOURNEY_ROLES = ['Guide', 'Scout', 'Hunter', 'Look-out'] as const

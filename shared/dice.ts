@@ -160,7 +160,8 @@ export function roll(expression: string, mode: RollMode = 'normal', rng: Rng = M
       continue
     }
 
-    let { count, sides, keep, rerollAtOrBelow } = term.dice
+    const { sides, rerollAtOrBelow } = term.dice
+    let { count, keep } = term.dice
     let notation = term.notation
 
     // Advantage on a plain d20: roll two and keep the better (or worse) one.

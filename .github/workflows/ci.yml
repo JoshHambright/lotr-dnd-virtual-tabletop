@@ -5,8 +5,14 @@ on:
     branches: ['**']
   pull_request:
 
+# A newer push makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
+  quality:
+    name: Lint, types, tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +21,34 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Types
+        run: npm run typecheck
+
+      # Coverage thresholds live in vite.config.ts and are gated hardest on
+      # the core, where a gap is a gap at the table.
+      - name: Tests and coverage
+        run: npm run coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
 
   end-to-end:
+    name: Leak assertions against a real server
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,10 +58,26 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      # Start the real Worker and assert a real player socket never receives
-      # the GM's material.
-      - name: Start the Worker
+
+      # Plants marked secrets in staged scenes, hidden tokens, stat blocks and
+      # GM notes, then proves none of them reach a real player socket. Treated
+      # as a security test: it is never skipped and never made advisory.
+      - name: Start the server
         run: npx wrangler dev --port 8787 &
       - name: Wait for it
         run: npx wait-on http://127.0.0.1:8787 --timeout 90000
-      - run: node scripts/smoke.mjs
+      - name: Smoke test
+        run: node scripts/smoke.mjs
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Audit
+        run: npm audit --audit-level=high

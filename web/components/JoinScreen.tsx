@@ -91,9 +91,7 @@ export function JoinScreen({ initialCode, onJoin }: { initialCode: string; onJoi
     <main className="join">
       <div className="join__card">
         <h1>Middle-earth Table</h1>
-        <p className="join__blurb">
-          A shared map, honest dice and everyone’s sheets — for a game played over a call.
-        </p>
+        <p className="join__blurb">A shared map, honest dice and everyone’s sheets — for a game played over a call.</p>
 
         <label className="field">
           <span>Your name</span>

@@ -199,9 +199,20 @@ export class TableRoom {
 
     const id = crypto.randomUUID()
     const sql = this.ctx.storage.sql
-    sql.exec('INSERT INTO asset_meta (id, type, size, created) VALUES (?, ?, ?, ?)', id, type, bytes.byteLength, Date.now())
+    sql.exec(
+      'INSERT INTO asset_meta (id, type, size, created) VALUES (?, ?, ?, ?)',
+      id,
+      type,
+      bytes.byteLength,
+      Date.now(),
+    )
     for (let offset = 0, index = 0; offset < bytes.byteLength; offset += ASSET_CHUNK, index++) {
-      sql.exec('INSERT INTO asset_chunk (id, idx, bytes) VALUES (?, ?, ?)', id, index, bytes.slice(offset, offset + ASSET_CHUNK))
+      sql.exec(
+        'INSERT INTO asset_chunk (id, idx, bytes) VALUES (?, ?, ?)',
+        id,
+        index,
+        bytes.slice(offset, offset + ASSET_CHUNK),
+      )
     }
 
     return respond({ id, size: bytes.byteLength, type })
@@ -217,7 +228,9 @@ export class TableRoom {
     }
 
     const sql = this.ctx.storage.sql
-    const meta = sql.exec<{ type: string; size: number }>('SELECT type, size FROM asset_meta WHERE id = ?', id).toArray()
+    const meta = sql
+      .exec<{ type: string; size: number }>('SELECT type, size FROM asset_meta WHERE id = ?', id)
+      .toArray()
     if (!meta.length) return respond({ error: 'Not found' }, 404)
 
     const chunks = sql
@@ -353,8 +366,7 @@ export class TableRoom {
   #handleRoll(ws: WebSocket, attachment: Attachment, message: Extract<ClientMessage, { k: 'roll' }>): void {
     // Only the GM may roll where the table cannot see it.
     const visibility = message.visibility === 'gm' && attachment.role === 'gm' ? 'gm' : 'public'
-    const mode: RollMode =
-      message.mode === 'advantage' || message.mode === 'disadvantage' ? message.mode : 'normal'
+    const mode: RollMode = message.mode === 'advantage' || message.mode === 'disadvantage' ? message.mode : 'normal'
 
     let result
     try {
@@ -381,7 +393,9 @@ export class TableRoom {
   }
 
   #handleChat(attachment: Attachment, message: Extract<ClientMessage, { k: 'chat' }>): void {
-    const text = String(message.text ?? '').trim().slice(0, MAX_CHAT_LENGTH)
+    const text = String(message.text ?? '')
+      .trim()
+      .slice(0, MAX_CHAT_LENGTH)
     if (!text) return
     const entry: ChatMessage = {
       id: crypto.randomUUID(),

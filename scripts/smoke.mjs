@@ -54,7 +54,10 @@ async function main() {
   check('a table can be opened', Boolean(created.code && created.gmKey))
   const { code, gmKey } = created
 
-  check('the table reports itself as existing', (await (await fetch(`${BASE}/api/room/${code}/exists`)).json()).exists === true)
+  check(
+    'the table reports itself as existing',
+    (await (await fetch(`${BASE}/api/room/${code}/exists`)).json()).exists === true,
+  )
 
   // --- Uploading a map -------------------------------------------------------
   // A 1x1 PNG is enough; nothing here inspects the pixels.
@@ -63,10 +66,18 @@ async function main() {
     (c) => c.charCodeAt(0),
   )
   const liveAsset = await (
-    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, { method: 'PUT', headers: { 'content-type': 'image/png' }, body: png })
+    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png' },
+      body: png,
+    })
   ).json()
   const stagedAsset = await (
-    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, { method: 'PUT', headers: { 'content-type': 'image/png' }, body: png })
+    await fetch(`${BASE}/api/room/${code}/asset?key=${gmKey}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png' },
+      body: png,
+    })
   ).json()
   check('the GM can upload a map', Boolean(liveAsset.id))
 
@@ -122,41 +133,118 @@ async function main() {
   gm.send({ k: 'op', op: { t: 'scene.create', scene: makeScene(live, 'Strider is watching from the corner') } })
   gm.send({ k: 'op', op: { t: 'scene.create', scene: makeScene(staged, 'SECRET-NAZGUL-AMBUSH') } })
   gm.send({ k: 'op', op: { t: 'scene.setActive', id: live.id } })
-  gm.send({ k: 'op', op: { t: 'statblock.upsert', statBlock: { id: 'sb1', name: 'SECRET-CAVE-TROLL', kind: 'Troll', armourClass: 15, maxHp: 84, speed: '30 ft.', abilities: { str: 18 }, attributeLevel: 5, endurance: 84, might: 2, resolve: 3, hateOrDespair: 4, attacks: 'Club', specials: '', notes: '', color: '#a33d3d', imageAssetId: null } } })
-  gm.send({ k: 'op', op: { t: 'encounter.upsert', encounter: { id: 'e1', name: 'SECRET-AMBUSH', notes: '', members: [{ statBlockId: 'sb1', count: 2 }] } } })
+  gm.send({
+    k: 'op',
+    op: {
+      t: 'statblock.upsert',
+      statBlock: {
+        id: 'sb1',
+        name: 'SECRET-CAVE-TROLL',
+        kind: 'Troll',
+        armourClass: 15,
+        maxHp: 84,
+        speed: '30 ft.',
+        abilities: { str: 18 },
+        attributeLevel: 5,
+        endurance: 84,
+        might: 2,
+        resolve: 3,
+        hateOrDespair: 4,
+        attacks: 'Club',
+        specials: '',
+        notes: '',
+        color: '#a33d3d',
+        imageAssetId: null,
+      },
+    },
+  })
+  gm.send({
+    k: 'op',
+    op: {
+      t: 'encounter.upsert',
+      encounter: { id: 'e1', name: 'SECRET-AMBUSH', notes: '', members: [{ statBlockId: 'sb1', count: 2 }] },
+    },
+  })
   await sleep(300)
 
   const token = (id, sceneId, extra) => ({
-    id, sceneId, x: 100, y: 100, squares: 1, label: id, color: '#c2703d', imageAssetId: null,
-    hidden: false, characterId: null, statBlockId: null, hp: null, maxHp: null,
-    showHpToPlayers: true, conditions: [], locked: false, ...extra,
+    id,
+    sceneId,
+    x: 100,
+    y: 100,
+    squares: 1,
+    label: id,
+    color: '#c2703d',
+    imageAssetId: null,
+    hidden: false,
+    characterId: null,
+    statBlockId: null,
+    hp: null,
+    maxHp: null,
+    showHpToPlayers: true,
+    conditions: [],
+    locked: false,
+    ...extra,
   })
 
   gm.send({ k: 'op', op: { t: 'token.create', token: token('frodo', live.id, { label: 'Frodo' }) } })
-  gm.send({ k: 'op', op: { t: 'token.create', token: token('lurker', live.id, { label: 'SECRET-BILL-FERNY', hidden: true, statBlockId: 'sb1' }) } })
-  gm.send({ k: 'op', op: { t: 'token.create', token: token('orc', live.id, { label: 'Orc', hp: 7, maxHp: 11, showHpToPlayers: false }) } })
-  gm.send({ k: 'op', op: { t: 'fog.paint', sceneId: live.id, shape: { kind: 'circle', x: 100, y: 100, radius: 90 }, reveal: true } })
+  gm.send({
+    k: 'op',
+    op: {
+      t: 'token.create',
+      token: token('lurker', live.id, { label: 'SECRET-BILL-FERNY', hidden: true, statBlockId: 'sb1' }),
+    },
+  })
+  gm.send({
+    k: 'op',
+    op: { t: 'token.create', token: token('orc', live.id, { label: 'Orc', hp: 7, maxHp: 11, showHpToPlayers: false }) },
+  })
+  gm.send({
+    k: 'op',
+    op: { t: 'fog.paint', sceneId: live.id, shape: { kind: 'circle', x: 100, y: 100, radius: 90 }, reveal: true },
+  })
   await sleep(400)
 
   // --- The leak checks -------------------------------------------------------
   const playerSaw = everything(player)
-  for (const secret of ['SECRET-NAZGUL-AMBUSH', 'SECRET-CAVE-TROLL', 'SECRET-AMBUSH', 'SECRET-BILL-FERNY', 'Strider is watching']) {
+  for (const secret of [
+    'SECRET-NAZGUL-AMBUSH',
+    'SECRET-CAVE-TROLL',
+    'SECRET-AMBUSH',
+    'SECRET-BILL-FERNY',
+    'Strider is watching',
+  ]) {
     check(`a player is never sent "${secret}"`, !playerSaw.includes(secret))
   }
 
   const playerOps = allOps(player)
-  check('a player is told about the visible token', playerOps.some((o) => o.t === 'token.create' && o.token.id === 'frodo'))
-  check('a player is not told about the hidden one', !playerOps.some((o) => o.t === 'token.create' && o.token.id === 'lurker'))
+  check(
+    'a player is told about the visible token',
+    playerOps.some((o) => o.t === 'token.create' && o.token.id === 'frodo'),
+  )
+  check(
+    'a player is not told about the hidden one',
+    !playerOps.some((o) => o.t === 'token.create' && o.token.id === 'lurker'),
+  )
   check(
     'a player gets the orc with its hit points stripped',
     playerOps.some((o) => o.t === 'token.create' && o.token.id === 'orc' && o.token.hp === null),
   )
-  check('a player receives fog on the live scene', playerOps.some((o) => o.t === 'fog.paint'))
+  check(
+    'a player receives fog on the live scene',
+    playerOps.some((o) => o.t === 'fog.paint'),
+  )
   check('the GM is told about everything', allOps(gm).filter((o) => o.t === 'token.create').length === 3)
 
   // --- Asset gating ----------------------------------------------------------
-  check('a player can fetch the map on the table', (await fetch(`${BASE}/api/room/${code}/asset/${liveAsset.id}`)).status === 200)
-  check('a player cannot fetch a staged map', (await fetch(`${BASE}/api/room/${code}/asset/${stagedAsset.id}`)).status === 404)
+  check(
+    'a player can fetch the map on the table',
+    (await fetch(`${BASE}/api/room/${code}/asset/${liveAsset.id}`)).status === 200,
+  )
+  check(
+    'a player cannot fetch a staged map',
+    (await fetch(`${BASE}/api/room/${code}/asset/${stagedAsset.id}`)).status === 404,
+  )
   check(
     'the GM can fetch the staged map',
     (await fetch(`${BASE}/api/room/${code}/asset/${stagedAsset.id}?key=${gmKey}`)).status === 200,
@@ -167,8 +255,14 @@ async function main() {
   gm.send({ k: 'op', op: { t: 'token.update', id: 'lurker', patch: { hidden: false } } })
   await sleep(300)
   const revealOps = allOps(player).slice(beforeReveal)
-  check('revealing reaches the player as a create', revealOps.some((o) => o.t === 'token.create' && o.token.id === 'lurker'))
-  check('and still without the stat block link', revealOps.every((o) => o.t !== 'token.create' || o.token.statBlockId === null))
+  check(
+    'revealing reaches the player as a create',
+    revealOps.some((o) => o.t === 'token.create' && o.token.id === 'lurker'),
+  )
+  check(
+    'and still without the stat block link',
+    revealOps.every((o) => o.t !== 'token.create' || o.token.statBlockId === null),
+  )
 
   // --- What a player may do --------------------------------------------------
   player.send({ k: 'op', op: { t: 'token.move', id: 'frodo', x: 210, y: 140 } })
@@ -177,7 +271,10 @@ async function main() {
   await sleep(400)
 
   const gmOps = allOps(gm)
-  check('a player may move a token', gmOps.some((o) => o.t === 'token.move' && o.x === 210))
+  check(
+    'a player may move a token',
+    gmOps.some((o) => o.t === 'token.move' && o.x === 210),
+  )
   check('a player is refused the GM’s operations', player.received.filter((m) => m.k === 'error').length >= 2)
   check(
     'and the table did not switch scenes',
@@ -194,9 +291,18 @@ async function main() {
   const publicRolls = allOps(player).filter((o) => o.t === 'roll.add')
   check('a public roll reaches the table', publicRolls.length === rollsBefore + 1)
   check('a GM roll behind the screen does not', !publicRolls.some((o) => o.roll.label === 'Ambush'))
-  check('the GM sees their own private roll', allOps(gm).some((o) => o.t === 'roll.add' && o.roll.visibility === 'gm'))
-  check('every roll carries a seed so clients animate alike', publicRolls.every((o) => typeof o.roll.seed === 'number'))
-  check('a nonsense expression is refused, not crashed', player.received.some((m) => m.k === 'error' && /dice/i.test(m.message)))
+  check(
+    'the GM sees their own private roll',
+    allOps(gm).some((o) => o.t === 'roll.add' && o.roll.visibility === 'gm'),
+  )
+  check(
+    'every roll carries a seed so clients animate alike',
+    publicRolls.every((o) => typeof o.roll.seed === 'number'),
+  )
+  check(
+    'a nonsense expression is refused, not crashed',
+    player.received.some((m) => m.k === 'error' && /dice/i.test(m.message)),
+  )
 
   const stealth = publicRolls.at(-1)?.roll
   check('the server rolled the dice, not the client', stealth?.result?.terms?.[0]?.rolls?.length === 2)
@@ -204,16 +310,45 @@ async function main() {
 
   // --- Sheets ----------------------------------------------------------------
   const sheet = {
-    id: 'c1', name: 'Frodo', ownerName: 'Gandalf the White', culture: 'Hobbits of the Shire', calling: 'Treasure Hunter',
-    level: 3, abilities: { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 }, skillProficiency: { stealth: 1 },
-    saveProficiency: {}, maxHp: 22, currentHp: 22, tempHp: 0, armourClass: 13, speed: 25, shadow: 1,
-    shadowPath: 'Dragon-sickness', hope: 3, maxHope: 3, weary: false, miserable: false, standardOfLiving: 'Frugal',
-    patron: '', journeyRole: 'Scout', valour: 1, wisdom: 2, virtues: '', rewards: '', equipment: 'Sting',
-    treasure: '', features: '', notes: '', gmNotes: 'SECRET-TEMPT-HIM', portraitAssetId: null,
+    id: 'c1',
+    name: 'Frodo',
+    ownerName: 'Gandalf the White',
+    culture: 'Hobbits of the Shire',
+    calling: 'Treasure Hunter',
+    level: 3,
+    abilities: { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 },
+    skillProficiency: { stealth: 1 },
+    saveProficiency: {},
+    maxHp: 22,
+    currentHp: 22,
+    tempHp: 0,
+    armourClass: 13,
+    speed: 25,
+    shadow: 1,
+    shadowPath: 'Dragon-sickness',
+    hope: 3,
+    maxHope: 3,
+    weary: false,
+    miserable: false,
+    standardOfLiving: 'Frugal',
+    patron: '',
+    journeyRole: 'Scout',
+    valour: 1,
+    wisdom: 2,
+    virtues: '',
+    rewards: '',
+    equipment: 'Sting',
+    treasure: '',
+    features: '',
+    notes: '',
+    gmNotes: 'SECRET-TEMPT-HIM',
+    portraitAssetId: null,
   }
   player.send({ k: 'op', op: { t: 'character.upsert', character: sheet } })
   await sleep(300)
-  const saved = allOps(gm).filter((o) => o.t === 'character.upsert').at(-1)?.character
+  const saved = allOps(gm)
+    .filter((o) => o.t === 'character.upsert')
+    .at(-1)?.character
   check('ownership comes from the connection, not the payload', saved?.ownerName === 'Josh')
   check('a player cannot write the GM’s private notes', saved?.gmNotes === '')
 
@@ -228,7 +363,10 @@ async function main() {
   check('a returning player gets the live scene', Boolean(snapshot?.state.scenes[live.id]))
   check('and not the staged one', !snapshot?.state.scenes[staged.id])
   check('and an empty bestiary', Object.keys(snapshot?.state.bestiary ?? {}).length === 0)
-  check('and only public rolls', snapshot?.state.rolls.every((r) => r.visibility === 'public'))
+  check(
+    'and only public rolls',
+    snapshot?.state.rolls.every((r) => r.visibility === 'public'),
+  )
   check('and the token that moved is where it was left', snapshot?.state.tokens.frodo?.x === 210)
 
   for (const peer of [gm, player, impostor, returning]) peer.socket.close()

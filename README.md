@@ -21,7 +21,7 @@ explores it, or covers it back over when they leave. The GM sees through the
 fog to work; players get a wall. A "see it as players do" toggle shows the GM
 exactly what the table is looking at.
 
-**Maps staged in advance.** Only the map put *on the table* reaches players.
+**Maps staged in advance.** Only the map put _on the table_ reaches players.
 Everything else on the shelf — next week's ambush, the map with the secret door
 drawn on it — stays on the GM's screen, and the image cannot even be fetched by
 a player who knows its address.
@@ -79,7 +79,7 @@ A rough first session:
 3. Players: **Sheets → Create my sheet**, fill it in, **To map** to put a token
    down.
 4. GM: **Bestiary → New creature**, write up the orcs, **Drop on map**. They
-   arrive hidden — untick *Hidden from players* when they burst in.
+   arrive hidden — untick _Hidden from players_ when they burst in.
 5. Everyone: roll from the **Dice** tab, or straight off a skill on your sheet.
 
 ## What it deliberately doesn't do
@@ -95,7 +95,7 @@ A rough first session:
   computed from walls.
 - **Fog is not proof against a determined player.** The mask is server-side and
   players are never sent the hidden parts of it, so there's no toggle to flip —
-  but the map *image* is delivered whole, so someone reading network traffic
+  but the map _image_ is delivered whole, so someone reading network traffic
   could see the unexplored corners. Hidden tokens, stat blocks, GM notes,
   staged maps and private rolls have no such gap; those are genuinely never
   transmitted. [docs/FOG_OF_WAR.md](docs/FOG_OF_WAR.md) explains the difference
@@ -110,7 +110,7 @@ coordination between servers and no race when two players grab the same token.
 
 The interesting part is `shared/visibility.ts`, which is why the screen can be
 trusted: it decides what a player is sent, and rewrites what a player is allowed
-to do. Revealing a hidden token reaches a player as *create*, not as a flag
+to do. Revealing a hidden token reaches a player as _create_, not as a flag
 flipping, because their browser never held the token at all.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) goes through it properly.

@@ -252,9 +252,7 @@ export function reduce(state: RoomState, op: Op): RoomState {
       if (!state.scenes[op.id]) return state
       const scenes = { ...state.scenes }
       delete scenes[op.id]
-      const tokens = Object.fromEntries(
-        Object.entries(state.tokens).filter(([, token]) => token.sceneId !== op.id),
-      )
+      const tokens = Object.fromEntries(Object.entries(state.tokens).filter(([, token]) => token.sceneId !== op.id))
       return {
         ...state,
         scenes,
@@ -367,16 +365,7 @@ function appendCapped<T>(list: T[], item: T): T[] {
 
 // --- Construction helpers ---------------------------------------------------
 
-export const TOKEN_COLORS = [
-  '#c2703d',
-  '#5b7f52',
-  '#3f6b8f',
-  '#8a4f6d',
-  '#b8912f',
-  '#6a5a8c',
-  '#a33d3d',
-  '#3f7f77',
-]
+export const TOKEN_COLORS = ['#c2703d', '#5b7f52', '#3f6b8f', '#8a4f6d', '#b8912f', '#6a5a8c', '#a33d3d', '#3f7f77']
 
 export function newScene(id: string, name: string, width: number, height: number, assetId: string | null): Scene {
   return {

@@ -37,7 +37,9 @@ export function RollDetail({ result }: { result: RollResult }) {
                   ) : (
                     <s className="roll-detail__dropped">{die.value}</s>
                   )}
-                  {die.rerolledFrom !== undefined ? <span className="roll-detail__dropped"> ←{die.rerolledFrom}</span> : null}
+                  {die.rerolledFrom !== undefined ? (
+                    <span className="roll-detail__dropped"> ←{die.rerolledFrom}</span>
+                  ) : null}
                 </span>
               ))}
               ]

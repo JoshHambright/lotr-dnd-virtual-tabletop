@@ -70,7 +70,9 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
   // The GM looks at whichever scene they are editing; players always see the
   // one on the table.
   const visibleScene = isGm
-    ? (editingSceneId ? room.scenes[editingSceneId] : null) ?? (room.activeSceneId ? room.scenes[room.activeSceneId] : null) ?? null
+    ? ((editingSceneId ? room.scenes[editingSceneId] : null) ??
+      (room.activeSceneId ? room.scenes[room.activeSceneId] : null) ??
+      null)
     : room.activeSceneId
       ? (room.scenes[room.activeSceneId] ?? null)
       : null
@@ -82,7 +84,9 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
     if (!visibleScene) return
     client.send({
       t: 'token.create',
-      token: newToken(crypto.randomUUID(), visibleScene.id, visibleScene.width / 2, visibleScene.height / 2, { label: 'Token' }),
+      token: newToken(crypto.randomUUID(), visibleScene.id, visibleScene.width / 2, visibleScene.height / 2, {
+        label: 'Token',
+      }),
     })
   }, [client, visibleScene])
 
@@ -111,18 +115,34 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
         </div>
 
         <div className="table__tools" role="group" aria-label="Map tools">
-          <button type="button" className={`chip${tool === 'select' ? ' chip--on' : ''}`} onClick={() => setTool('select')}>
+          <button
+            type="button"
+            className={`chip${tool === 'select' ? ' chip--on' : ''}`}
+            onClick={() => setTool('select')}
+          >
             Move
           </button>
-          <button type="button" className={`chip${tool === 'measure' ? ' chip--on' : ''}`} onClick={() => setTool('measure')}>
+          <button
+            type="button"
+            className={`chip${tool === 'measure' ? ' chip--on' : ''}`}
+            onClick={() => setTool('measure')}
+          >
             Measure
           </button>
           {canDrawFog ? (
             <>
-              <button type="button" className={`chip${tool === 'reveal' ? ' chip--on' : ''}`} onClick={() => setTool('reveal')}>
+              <button
+                type="button"
+                className={`chip${tool === 'reveal' ? ' chip--on' : ''}`}
+                onClick={() => setTool('reveal')}
+              >
                 Reveal
               </button>
-              <button type="button" className={`chip${tool === 'conceal' ? ' chip--on' : ''}`} onClick={() => setTool('conceal')}>
+              <button
+                type="button"
+                className={`chip${tool === 'conceal' ? ' chip--on' : ''}`}
+                onClick={() => setTool('conceal')}
+              >
                 Cover
               </button>
             </>
@@ -133,7 +153,11 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
                 Add token
               </button>
               <label className="checkbox">
-                <input type="checkbox" checked={previewAsPlayer} onChange={(event) => setPreviewAsPlayer(event.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={previewAsPlayer}
+                  onChange={(event) => setPreviewAsPlayer(event.target.checked)}
+                />
                 See it as players do
               </label>
             </>
@@ -163,7 +187,11 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
         <div className="notice">
           You are staging <strong>{room.scenes[editingSceneId]?.name}</strong>. The table is still looking at{' '}
           <strong>{room.activeSceneId ? room.scenes[room.activeSceneId]?.name : 'nothing'}</strong>.
-          <button type="button" className="button button--small" onClick={() => client.send({ t: 'scene.setActive', id: editingSceneId })}>
+          <button
+            type="button"
+            className="button button--small"
+            onClick={() => client.send({ t: 'scene.setActive', id: editingSceneId })}
+          >
             Put it on the table
           </button>
         </div>
@@ -189,7 +217,13 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
             {(['dice', 'sheets', 'maps', 'bestiary', 'talk'] as Tab[])
               .filter((name) => isGm || (name !== 'maps' && name !== 'bestiary'))
               .map((name) => (
-                <button key={name} type="button" role="tab" className={`chip${tab === name ? ' chip--on' : ''}`} onClick={() => setTab(name)}>
+                <button
+                  key={name}
+                  type="button"
+                  role="tab"
+                  className={`chip${tab === name ? ' chip--on' : ''}`}
+                  onClick={() => setTab(name)}
+                >
                   {tabLabel(name)}
                 </button>
               ))}
@@ -250,7 +284,9 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
                 <input
                   type="checkbox"
                   checked={room.settings.playersCanMoveAnyToken}
-                  onChange={(event) => client.send({ t: 'settings.update', patch: { playersCanMoveAnyToken: event.target.checked } })}
+                  onChange={(event) =>
+                    client.send({ t: 'settings.update', patch: { playersCanMoveAnyToken: event.target.checked } })
+                  }
                 />
                 Players can move any token
               </label>
@@ -258,7 +294,9 @@ function Table({ joined, onLeave }: { joined: Joined; onLeave: () => void }) {
                 <input
                   type="checkbox"
                   checked={room.settings.playersCanCreateTokens}
-                  onChange={(event) => client.send({ t: 'settings.update', patch: { playersCanCreateTokens: event.target.checked } })}
+                  onChange={(event) =>
+                    client.send({ t: 'settings.update', patch: { playersCanCreateTokens: event.target.checked } })
+                  }
                 />
                 Players can add and remove tokens
               </label>

@@ -66,10 +66,20 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
   return (
     <div className="panel">
       <div className="tabs" role="tablist">
-        <button type="button" role="tab" className={`chip${tab === 'creatures' ? ' chip--on' : ''}`} onClick={() => setTab('creatures')}>
+        <button
+          type="button"
+          role="tab"
+          className={`chip${tab === 'creatures' ? ' chip--on' : ''}`}
+          onClick={() => setTab('creatures')}
+        >
           Creatures
         </button>
-        <button type="button" role="tab" className={`chip${tab === 'encounters' ? ' chip--on' : ''}`} onClick={() => setTab('encounters')}>
+        <button
+          type="button"
+          role="tab"
+          className={`chip${tab === 'encounters' ? ' chip--on' : ''}`}
+          onClick={() => setTab('encounters')}
+        >
           Encounters
         </button>
       </div>
@@ -82,7 +92,11 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
           <ul className="scene-list">
             {bestiary.map((entry) => (
               <li key={entry.id}>
-                <button type="button" className="scene-list__name" onClick={() => onOpen(entry.id === openId ? null : entry.id)}>
+                <button
+                  type="button"
+                  className="scene-list__name"
+                  onClick={() => onOpen(entry.id === openId ? null : entry.id)}
+                >
                   <span className="dot" style={{ background: entry.color }} />
                   {entry.name}
                 </button>
@@ -96,7 +110,13 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
           {open ? <StatBlockEditor client={client} statBlock={open} onDeleted={() => onOpen(null)} /> : null}
         </>
       ) : (
-        <EncountersTab client={client} bestiary={bestiary} encounters={encounters} scene={scene} onDeploy={deployEncounter} />
+        <EncountersTab
+          client={client}
+          bestiary={bestiary}
+          encounters={encounters}
+          scene={scene}
+          onDeploy={deployEncounter}
+        />
       )}
     </div>
   )
@@ -111,11 +131,17 @@ function StatBlockEditor({
   statBlock: StatBlock
   onDeleted: () => void
 }) {
-  const patch = (value: Partial<StatBlock>) => client.send({ t: 'statblock.upsert', statBlock: { ...statBlock, ...value } })
+  const patch = (value: Partial<StatBlock>) =>
+    client.send({ t: 'statblock.upsert', statBlock: { ...statBlock, ...value } })
 
   const rollAttack = (ability: string) => {
     const modifier = abilityModifier(statBlock.abilities[ability] ?? 10)
-    client.roll(`1d20${formatModifier(modifier)}`, `${statBlock.name} — ${ABILITY_NAMES[ability as never] ?? ability}`, 'normal', 'gm')
+    client.roll(
+      `1d20${formatModifier(modifier)}`,
+      `${statBlock.name} — ${ABILITY_NAMES[ability as never] ?? ability}`,
+      'normal',
+      'gm',
+    )
   }
 
   return (
@@ -131,11 +157,21 @@ function StatBlockEditor({
         </label>
         <label className="field">
           <span>Armour class</span>
-          <input className="input" type="number" value={statBlock.armourClass} onChange={(event) => patch({ armourClass: Number(event.target.value) })} />
+          <input
+            className="input"
+            type="number"
+            value={statBlock.armourClass}
+            onChange={(event) => patch({ armourClass: Number(event.target.value) })}
+          />
         </label>
         <label className="field">
           <span>Hit points</span>
-          <input className="input" type="number" value={statBlock.maxHp} onChange={(event) => patch({ maxHp: Number(event.target.value) })} />
+          <input
+            className="input"
+            type="number"
+            value={statBlock.maxHp}
+            onChange={(event) => patch({ maxHp: Number(event.target.value) })}
+          />
         </label>
         <label className="field">
           <span>Speed</span>
@@ -163,7 +199,9 @@ function StatBlockEditor({
                 className="ability__score"
                 type="number"
                 value={score}
-                onChange={(event) => patch({ abilities: { ...statBlock.abilities, [key]: Number(event.target.value) } })}
+                onChange={(event) =>
+                  patch({ abilities: { ...statBlock.abilities, [key]: Number(event.target.value) } })
+                }
               />
               <button type="button" className="ability__mod" onClick={() => rollAttack(key)}>
                 {formatModifier(abilityModifier(score))}
@@ -176,11 +214,21 @@ function StatBlockEditor({
       <div className="sheet__grid">
         <label className="field">
           <span>Might</span>
-          <input className="input" type="number" value={statBlock.might} onChange={(event) => patch({ might: Number(event.target.value) })} />
+          <input
+            className="input"
+            type="number"
+            value={statBlock.might}
+            onChange={(event) => patch({ might: Number(event.target.value) })}
+          />
         </label>
         <label className="field">
           <span>Resolve</span>
-          <input className="input" type="number" value={statBlock.resolve} onChange={(event) => patch({ resolve: Number(event.target.value) })} />
+          <input
+            className="input"
+            type="number"
+            value={statBlock.resolve}
+            onChange={(event) => patch({ resolve: Number(event.target.value) })}
+          />
         </label>
         <label className="field">
           <span>Hate / Despair</span>
@@ -195,15 +243,27 @@ function StatBlockEditor({
 
       <label className="field field--wide">
         <span>Attacks</span>
-        <textarea className="input input--area" value={statBlock.attacks} onChange={(event) => patch({ attacks: event.target.value })} />
+        <textarea
+          className="input input--area"
+          value={statBlock.attacks}
+          onChange={(event) => patch({ attacks: event.target.value })}
+        />
       </label>
       <label className="field field--wide">
         <span>Special abilities</span>
-        <textarea className="input input--area" value={statBlock.specials} onChange={(event) => patch({ specials: event.target.value })} />
+        <textarea
+          className="input input--area"
+          value={statBlock.specials}
+          onChange={(event) => patch({ specials: event.target.value })}
+        />
       </label>
       <label className="field field--wide">
         <span>Notes</span>
-        <textarea className="input input--area" value={statBlock.notes} onChange={(event) => patch({ notes: event.target.value })} />
+        <textarea
+          className="input input--area"
+          value={statBlock.notes}
+          onChange={(event) => patch({ notes: event.target.value })}
+        />
       </label>
 
       <button
@@ -253,11 +313,20 @@ function EncountersTab({
       <ul className="scene-list">
         {encounters.map((encounter) => (
           <li key={encounter.id}>
-            <button type="button" className="scene-list__name" onClick={() => setOpenId(encounter.id === openId ? null : encounter.id)}>
+            <button
+              type="button"
+              className="scene-list__name"
+              onClick={() => setOpenId(encounter.id === openId ? null : encounter.id)}
+            >
               {encounter.name}
               <span className="hint">{encounter.members.reduce((sum, m) => sum + m.count, 0)} creatures</span>
             </button>
-            <button type="button" className="button button--small" disabled={!scene} onClick={() => onDeploy(encounter)}>
+            <button
+              type="button"
+              className="button button--small"
+              disabled={!scene}
+              onClick={() => onDeploy(encounter)}
+            >
               Deploy
             </button>
           </li>
@@ -269,7 +338,11 @@ function EncountersTab({
         <div className="scene-editor">
           <label className="field">
             <span>Name</span>
-            <input className="input" value={open.name} onChange={(event) => patch(open, { name: event.target.value })} />
+            <input
+              className="input"
+              value={open.name}
+              onChange={(event) => patch(open, { name: event.target.value })}
+            />
           </label>
 
           <ul className="scene-list">
@@ -323,7 +396,11 @@ function EncountersTab({
 
           <label className="field field--wide">
             <span>Notes</span>
-            <textarea className="input input--area" value={open.notes} onChange={(event) => patch(open, { notes: event.target.value })} />
+            <textarea
+              className="input input--area"
+              value={open.notes}
+              onChange={(event) => patch(open, { notes: event.target.value })}
+            />
           </label>
 
           <button

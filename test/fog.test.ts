@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { cellAt, createMask, fromCells, isRevealed, paint, resize, revealedFraction, setAll, toCells } from '../shared/fog.js'
+import {
+  cellAt,
+  createMask,
+  fromCells,
+  isRevealed,
+  paint,
+  resize,
+  revealedFraction,
+  setAll,
+  toCells,
+} from '../shared/fog.js'
 
 describe('createMask', () => {
   it('starts fully hidden as a single run', () => {
@@ -61,7 +71,15 @@ describe('paint', () => {
   it('reveals a polygon', () => {
     const mask = paint(
       createMask(320, 320, 32),
-      { kind: 'poly', points: [{ x: 0, y: 0 }, { x: 128, y: 0 }, { x: 128, y: 128 }, { x: 0, y: 128 }] },
+      {
+        kind: 'poly',
+        points: [
+          { x: 0, y: 0 },
+          { x: 128, y: 0 },
+          { x: 128, y: 128 },
+          { x: 0, y: 128 },
+        ],
+      },
       true,
     )
     expect(isRevealed(mask, 64, 64)).toBe(true)
