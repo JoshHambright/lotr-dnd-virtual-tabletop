@@ -91,7 +91,7 @@ export function CharacterSheet({ client, character, editable }: Props) {
           onChange={(calling) => update({ calling, shadowPath: SHADOW_PATHS[calling] ?? draft.shadowPath })}
           readOnly={!editable}
         />
-        <Number label="Level" value={draft.level} min={1} max={20} onChange={(level) => update({ level })} readOnly={!editable} />
+        <NumberField label="Level" value={draft.level} min={1} max={20} onChange={(level) => update({ level })} readOnly={!editable} />
         <div className="sheet__derived">
           <span>Proficiency</span>
           <strong>{formatModifier(proficiency)}</strong>
@@ -126,23 +126,23 @@ export function CharacterSheet({ client, character, editable }: Props) {
       <section className="sheet__section">
         <h3>Standing</h3>
         <div className="sheet__grid">
-          <Number label="Hit points" value={draft.currentHp} onChange={(currentHp) => update({ currentHp })} readOnly={!editable} />
-          <Number label="Maximum" value={draft.maxHp} onChange={(maxHp) => update({ maxHp })} readOnly={!editable} />
-          <Number label="Temporary" value={draft.tempHp} onChange={(tempHp) => update({ tempHp })} readOnly={!editable} />
-          <Number label="Armour class" value={draft.armourClass} onChange={(armourClass) => update({ armourClass })} readOnly={!editable} />
-          <Number label="Speed" value={draft.speed} onChange={(speed) => update({ speed })} readOnly={!editable} />
+          <NumberField label="Hit points" value={draft.currentHp} onChange={(currentHp) => update({ currentHp })} readOnly={!editable} />
+          <NumberField label="Maximum" value={draft.maxHp} onChange={(maxHp) => update({ maxHp })} readOnly={!editable} />
+          <NumberField label="Temporary" value={draft.tempHp} onChange={(tempHp) => update({ tempHp })} readOnly={!editable} />
+          <NumberField label="Armour class" value={draft.armourClass} onChange={(armourClass) => update({ armourClass })} readOnly={!editable} />
+          <NumberField label="Speed" value={draft.speed} onChange={(speed) => update({ speed })} readOnly={!editable} />
         </div>
       </section>
 
       <section className="sheet__section sheet__section--shadow">
         <h3>Hope and Shadow</h3>
         <div className="sheet__grid">
-          <Number label="Hope" value={draft.hope} onChange={(hope) => update({ hope })} readOnly={!editable} />
-          <Number label="Hope maximum" value={draft.maxHope} onChange={(maxHope) => update({ maxHope })} readOnly={!editable} />
-          <Number label="Shadow points" value={draft.shadow} onChange={(shadow) => update({ shadow })} readOnly={!editable} />
+          <NumberField label="Hope" value={draft.hope} onChange={(hope) => update({ hope })} readOnly={!editable} />
+          <NumberField label="Hope maximum" value={draft.maxHope} onChange={(maxHope) => update({ maxHope })} readOnly={!editable} />
+          <NumberField label="Shadow points" value={draft.shadow} onChange={(shadow) => update({ shadow })} readOnly={!editable} />
           <Field label="Shadow path" value={draft.shadowPath} onChange={(shadowPath) => update({ shadowPath })} readOnly={!editable} />
-          <Number label="Valour" value={draft.valour} onChange={(valour) => update({ valour })} readOnly={!editable} />
-          <Number label="Wisdom" value={draft.wisdom} onChange={(wisdom) => update({ wisdom })} readOnly={!editable} />
+          <NumberField label="Valour" value={draft.valour} onChange={(valour) => update({ valour })} readOnly={!editable} />
+          <NumberField label="Wisdom" value={draft.wisdom} onChange={(wisdom) => update({ wisdom })} readOnly={!editable} />
         </div>
         <div className="sheet__conditions">
           <label className="checkbox">
@@ -251,7 +251,7 @@ function Field({
   )
 }
 
-function Number({
+function NumberField({
   label,
   value,
   onChange,
@@ -278,7 +278,7 @@ function Number({
         readOnly={readOnly}
         {...(min !== undefined ? { min } : {})}
         {...(max !== undefined ? { max } : {})}
-        onChange={(event) => onChange(globalThis.Number(event.target.value))}
+        onChange={(event) => onChange(Number(event.target.value))}
       />
     </div>
   )

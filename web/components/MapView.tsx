@@ -17,7 +17,6 @@ import {
   contrastingInk,
   fitToViewport,
   getImage,
-  mapToScreen,
   measureDistance,
   screenToMap,
   snapToGrid,
