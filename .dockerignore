@@ -1,0 +1,31 @@
+# What must never reach an image layer.
+#
+# .env holds TABLE_SECRET, which signs every GM key; data/ is the live
+# database and the uploaded maps. Both are gitignored, but .dockerignore is a
+# separate list and `COPY . .` does not consult .gitignore.
+.env
+.dev.vars
+data/
+
+# Built on the host, for the host. node_modules in particular is fatal rather
+# than merely wasteful: better-sqlite3 is native, so a Windows or macOS build
+# copied over the Linux one the builder just compiled fails at require() time.
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+**/dist-demo/
+.wrangler/
+
+# Nothing the build reads.
+.git/
+.github/
+.claude/
+docs/
+*.md
+!README.md
+.vscode/
+.idea/
+coverage/
+**/coverage/
+*.log

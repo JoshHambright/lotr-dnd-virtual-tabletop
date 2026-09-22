@@ -1,0 +1,7 @@
+# Checked out on Windows, run inside a Linux container. A shell script with
+# CRLF endings fails at the shebang with "no such file or directory", naming
+# the interpreter rather than the carriage return that is actually at fault —
+# so these stay LF regardless of core.autocrlf.
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf

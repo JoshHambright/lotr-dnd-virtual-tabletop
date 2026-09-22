@@ -14,12 +14,15 @@ docker compose up -d
 The app is then on `http://localhost:8080`, bound to loopback on purpose —
 nothing outside the house can reach it until you start the tunnel.
 
-> **Caveat, stated plainly:** the server, its export and restore, and the whole
-> app have been verified running directly under Node. The Dockerfile and
-> compose file have _not_ been built, because the build environment they were
-> written in has no Docker daemon. Expect to hit something the first time you
-> run `docker compose up`; it is likelier to be a missing build dependency than
-> a design problem, and worth doing once before a session rather than during one.
+The image builds and runs: `docker compose up -d` brings the app up healthy on
+Docker 29 with Compose v5, serving the same tables as a run under Node, because
+both read `./data` and derive GM keys from the same `TABLE_SECRET`. You can move
+between the two without anyone losing their key.
+
+> **One caveat that remains:** this was verified on Docker Desktop for Windows,
+> where a bind mount carries no Unix ownership. On a Linux host `/data` arrives
+> owned by the host user instead, and the entrypoint chowns it before dropping
+> to the unprivileged `table` user — that path is written but has not been run.
 
 ## Running it without Docker
 
