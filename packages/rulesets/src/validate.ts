@@ -9,7 +9,7 @@
 
 import { z } from 'zod'
 import { FormulaError, parse } from '@vtt/formula'
-import type { RulesetPack } from './pack.js'
+import type { Field, RulesetPack } from './pack.js'
 
 const identifier = z
   .string()
@@ -63,10 +63,17 @@ const field: z.ZodType = z.lazy(() =>
       ...baseField,
       options: z.array(z.string().min(1).max(120)).min(1).max(200),
       allowCustom: z.boolean(),
+      suggest: z
+        .object({
+          fromKey: identifier,
+          map: z.record(z.string().min(1).max(120), z.string().min(1).max(120)),
+          unverified: z.boolean().optional(),
+        })
+        .optional(),
     }),
     z.object({
       kind: z.literal('abilityBlock'),
-      ...baseField,
+      key: identifier,
       abilities: z
         .array(z.object({ key: identifier, label }))
         .min(1)
@@ -76,7 +83,7 @@ const field: z.ZodType = z.lazy(() =>
     }),
     z.object({
       kind: z.literal('skillList'),
-      ...baseField,
+      key: identifier,
       skills: z.array(z.object({ key: identifier, label, ability: identifier })).max(64),
       ranks: z.number().int().min(1).max(5),
       modifier: formula,
@@ -198,22 +205,65 @@ export function validatePack(value: unknown): RulesetPack {
     throw new PackError(`The ruleset pack ${typeof id === 'string' ? `"${id}"` : ''} is not valid:\n${where}`)
   }
 
-  // Keys have to be unique or a sheet silently overwrites its own fields.
-  const seen = new Set<string>()
-  for (const section of result.data.sheet.sections) {
-    for (const key of fieldKeys(section.fields as { key: string; fields?: unknown }[])) {
-      if (seen.has(key)) throw new PackError(`The pack "${result.data.id}" uses the field key "${key}" twice`)
-      seen.add(key)
-    }
-  }
-
+  crossCheck(result.data as RulesetPack)
   return result.data as RulesetPack
 }
 
-function* fieldKeys(fields: { key: string; fields?: unknown }[]): Generator<string> {
-  for (const field of fields) {
-    yield field.key
-    // A repeater's rows are their own namespace, so its inner keys are not
-    // compared against the sheet's.
+/**
+ * The checks zod cannot do: whether the names a pack uses point at anything.
+ *
+ * A skill governed by an ability the pack never declares, or a modifier keyed
+ * to a field that does not exist, is a dead rule — it type-checks, validates,
+ * and then quietly does nothing at the table. Cheaper to fail the build.
+ */
+function crossCheck(pack: RulesetPack): void {
+  function fail(message: string): never {
+    throw new PackError(`The pack "${pack.id}" ${message}`)
+  }
+
+  const fields = new Map<string, Field>()
+  const abilities = new Set<string>()
+
+  for (const section of pack.sheet.sections) {
+    for (const field of section.fields) {
+      // Keys have to be unique or a sheet silently overwrites its own values.
+      // A repeater's rows are their own namespace, so its inner keys are not
+      // compared against the sheet's.
+      if (fields.has(field.key)) fail(`uses the field key "${field.key}" twice`)
+      fields.set(field.key, field)
+      if (field.kind === 'abilityBlock') for (const ability of field.abilities) abilities.add(ability.key)
+    }
+  }
+
+  for (const field of fields.values()) {
+    if (field.kind === 'skillList') {
+      for (const skill of field.skills) {
+        if (!abilities.has(skill.ability)) {
+          fail(`governs the skill "${skill.key}" with "${skill.ability}", which is not an ability it declares`)
+        }
+      }
+    }
+    if (field.kind === 'select' && field.suggest) {
+      const from = fields.get(field.suggest.fromKey)
+      if (!from) fail(`suggests "${field.key}" from "${field.suggest.fromKey}", which is not a field`)
+      const options = from?.kind === 'select' ? from.options : undefined
+      const values = new Set(Object.values(field.suggest.map))
+      for (const value of values) {
+        if (!field.options.includes(value))
+          fail(`suggests "${value}" for "${field.key}", which is not one of its options`)
+      }
+      if (options) {
+        for (const key of Object.keys(field.suggest.map)) {
+          if (!options.includes(key))
+            fail(`keys a suggestion for "${field.key}" on "${key}", which "${from.key}" never offers`)
+        }
+      }
+    }
+  }
+
+  for (const modifier of pack.dice.modifiers ?? []) {
+    if (!fields.has(modifier.whenField)) {
+      fail(`applies "${modifier.id}" when "${modifier.whenField}" is set, but has no such field`)
+    }
   }
 }

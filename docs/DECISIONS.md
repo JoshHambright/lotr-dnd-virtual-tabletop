@@ -293,3 +293,41 @@ the work is small — the state is already one serializable object — and the
 thing at risk is a campaign that exists nowhere else. Shipping a tool people
 put months into with no way to get the data out is the kind of decision that
 only looks cheap before it costs something.
+
+---
+
+## D-020 — Scoped bindings for per-row formulas
+
+**Decided.** One formula serves a whole `abilityBlock` or `skillList`, and the
+row it is computing is supplied as extra names in scope: `@score` inside an
+ability block, `@mod` and `@rank` inside a skill list. A field's roll macro gets
+`@total` — the modifier that field just computed.
+
+The alternative was a formula per ability and per skill. For `lotr5e` that is
+twenty-three copies of two expressions, and twenty-three places for a typo that
+only shows up as one skill quietly rolling wrong. A pack that wants a genuinely
+different formula for one ability is asking for an exception the format should
+not grow a feature for; it can use a plain `number` field with its own `derived`.
+
+The binding names are part of the frozen contract, not a convention — they are
+written down in RULESET_PACKS.md and a pack referencing `@score` outside an
+ability block just gets 0, like any other missing name.
+
+---
+
+## D-021 — A pack may suggest a field's value, never decide it
+
+**Decided.** `select` fields take an optional `suggest: { fromKey, map,
+unverified }`. When the source field has a mapped value, the app offers the
+mapping; the field stays editable and nothing is filled in silently.
+
+The case that forced it is Shadow path, which follows a character's Calling —
+and which we could not verify against the book. Hardcoding the mapping would
+have put an unverified rule into a component; dropping it would have left every
+player looking it up. A suggestion carrying `unverified: true` is the honest
+shape: the app helps, says it is not certain, and a table that plays it
+differently edits one object in the pack rather than arguing with the software.
+
+It also generalises past the thing that prompted it — background to skills in
+SRD 5e is the same shape — which is the test for whether an addition to a frozen
+contract is a feature or a patch.

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ROOM_SCHEMA_VERSION, emptyRoom, identityFor, migrateRoom, newCharacter } from '../src/state.js'
+import {
+  DEFAULT_RULESET_ID,
+  ROOM_SCHEMA_VERSION,
+  emptyRoom,
+  identityFor,
+  migrateRoom,
+  newCharacter,
+} from '../src/state.js'
 
 describe('migrateRoom', () => {
   it('passes a current room through unchanged', () => {
@@ -21,6 +28,40 @@ describe('migrateRoom', () => {
     for (const value of [null, undefined, 42, 'a table']) {
       expect(() => migrateRoom(value)).toThrow(/not readable/)
     }
+  })
+
+  it('gives a table written before packs the one pack there was', () => {
+    const room = emptyRoom('Old table')
+    const settings = room.settings as Partial<typeof room.settings>
+    delete settings.rulesetId
+    const stored = { ...room, settings, schemaVersion: 2 }
+
+    const migrated = migrateRoom(stored)
+    expect(migrated.settings.rulesetId).toBe(DEFAULT_RULESET_ID)
+    expect(migrated.schemaVersion).toBe(ROOM_SCHEMA_VERSION)
+  })
+
+  it('leaves a table that already names a pack alone', () => {
+    const stored = { ...emptyRoom(), schemaVersion: 2 }
+    stored.settings.rulesetId = 'morkborg'
+    expect(migrateRoom(stored).settings.rulesetId).toBe('morkborg')
+  })
+
+  it('carries a sheet across both migrations at once', () => {
+    const character = newCharacter('c9', 'Bilbo', 'Bilbo')
+    const owned = character as Partial<typeof character>
+    delete owned.ownerId
+    const stored = {
+      ...emptyRoom(),
+      schemaVersion: 1,
+      settings: { name: 'Bag End', playersCanMoveAnyToken: true, playersCanCreateTokens: false },
+      characters: { [character.id]: owned },
+    }
+
+    const migrated = migrateRoom(stored)
+    expect(migrated.schemaVersion).toBe(ROOM_SCHEMA_VERSION)
+    expect(migrated.settings.rulesetId).toBe(DEFAULT_RULESET_ID)
+    expect(migrated.characters[character.id]?.ownerId).toBe(identityFor('Bilbo'))
   })
 
   it('does not mutate what it was given', () => {

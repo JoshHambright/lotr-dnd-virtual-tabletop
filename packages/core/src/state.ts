@@ -183,6 +183,14 @@ export interface Presence {
 
 export interface RoomSettings {
   name: string
+  /**
+   * Which ruleset pack this table plays, by id.
+   *
+   * A plain string on purpose: core stays free of `@vtt/rulesets`, so a table
+   * can record a pack that this build does not ship without the state layer
+   * caring. Resolving an id to a pack is the app's job, not the reducer's.
+   */
+  rulesetId: string
   /** When true any player may drag any unlocked token, not just their own. */
   playersCanMoveAnyToken: boolean
   /** When true players may add and delete tokens as well as move them. */
@@ -190,11 +198,19 @@ export interface RoomSettings {
 }
 
 /**
+ * What a table plays when nobody has said.
+ *
+ * Deliberately duplicated rather than imported from `@vtt/rulesets`: core
+ * knowing which packs exist is the dependency this whole indirection avoids.
+ */
+export const DEFAULT_RULESET_ID = 'lotr5e'
+
+/**
  * Bumped whenever the shape of a stored room changes. Added before there is
  * any data worth migrating, because retrofitting a version field onto rooms
  * already on disk means guessing which shape each one is.
  */
-export const ROOM_SCHEMA_VERSION = 2
+export const ROOM_SCHEMA_VERSION = 3
 
 export interface RoomState {
   /** The schema this room was written with. See `migrateRoom`. */
@@ -216,7 +232,7 @@ export const MAX_LOG_ENTRIES = 200
 export function emptyRoom(name = 'A new table'): RoomState {
   return {
     schemaVersion: ROOM_SCHEMA_VERSION,
-    settings: { name, playersCanMoveAnyToken: true, playersCanCreateTokens: false },
+    settings: { name, rulesetId: DEFAULT_RULESET_ID, playersCanMoveAnyToken: true, playersCanCreateTokens: false },
     scenes: {},
     activeSceneId: null,
     tokens: {},
@@ -539,6 +555,13 @@ const ROOM_MIGRATIONS: Record<number, (room: RoomState) => RoomState> = {
         { ...character, ownerId: character.ownerId || identityFor(character.ownerName) },
       ]),
     ),
+  }),
+
+  // Tables gained a ruleset. Every table written before this one was playing
+  // the Middle-earth sheet, because it was the only one there was.
+  2: (room) => ({
+    ...room,
+    settings: { ...room.settings, rulesetId: room.settings.rulesetId || DEFAULT_RULESET_ID },
   }),
 }
 

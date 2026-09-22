@@ -139,7 +139,15 @@ type Field =
   | { kind: 'longtext'; key: string; label: string }
   | { kind: 'number'; key: string; label: string; min?: number; max?: number; derived?: Formula }
   | { kind: 'toggle'; key: string; label: string }
-  | { kind: 'select'; key: string; label: string; options: string[]; allowCustom: boolean }
+  | {
+      kind: 'select'
+      key: string
+      label: string
+      options: string[]
+      allowCustom: boolean
+      /** Offer a value based on another field. Never fills it in silently. */
+      suggest?: { fromKey: string; map: Record<string, string>; unverified?: boolean }
+    }
 
   /** A block of scores with modifiers and a roll button each. */
   | {
@@ -170,6 +178,43 @@ type Field =
 `key` is the path into the character's value bag. Character storage becomes a
 `Record<string, unknown>` validated against the pack's schema, replacing today's
 fixed LotR-shaped interface.
+
+### Scoped bindings
+
+A block field declares **one** formula for every row in it, so the row being
+computed arrives as extra names in scope (D-020). Everything else resolves
+against the character as usual.
+
+| Where                   | Bound names                                                                                   |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `abilityBlock.modifier` | `@score` — that ability's score                                                               |
+| `skillList.modifier`    | `@mod` — the governing ability's modifier; `@rank` — the proficiency rank, `0` to `ranks - 1` |
+| a field's `roll`        | `@total` — the modifier that field just computed                                              |
+
+```
+floor((@score - 10) / 2)      an ability modifier, for all six
+@mod + @rank * @proficiency   a skill modifier, for all seventeen
+```
+
+`@proficiency` in that second line is not a binding — it is an ordinary
+reference to a derived `number` field the pack declares. A name that is bound
+nowhere resolves to 0, so `@score` outside an ability block is not an error, it
+is zero.
+
+### Suggestions
+
+```ts
+suggest?: { fromKey: string; map: Record<string, string>; unverified?: boolean }
+```
+
+"When Calling is Champion, the Shadow path is usually Lure of Secrets." The app
+offers it; the field stays editable; nothing is written without someone
+choosing it. `unverified: true` makes the app say it is not sure, which is the
+only honest way to ship a rule we could not check (D-021).
+
+Both halves are cross-checked at validation: a suggestion keyed on a value the
+source field never offers, or producing a value this field does not list, fails
+the build.
 
 ### Roll macros
 
@@ -260,6 +305,18 @@ licences and are later packs, not assumptions baked in now.
 Every pack validates in CI against a zod schema derived from these types, and
 every formula in every pack must parse. A malformed pack is a failed build.
 
-Packs load from `packages/rulesets/packs/<id>/`. A GM-supplied pack is a
+`validatePack` also does the checks a schema cannot: field keys are unique
+across the sheet (a repeater's rows are their own namespace), every skill is
+governed by an ability the pack actually declares, every roll modifier's
+`whenField` names a real field, and both ends of a suggestion resolve. Each of
+those is a rule that would otherwise type-check, validate, and then quietly do
+nothing at the table.
+
+Packs live in `packages/rulesets/packs/<id>/` and are imported statically by
+`src/registry.ts` — the same registry has to work in a browser bundle, in a
+Worker and in the Node server, and none of those three agree about filesystems.
+`getPack(id)` validates on first use and caches; an unknown id throws rather
+than falling back to the default, because a table silently switching rulesets
+is worse than a table that will not open. A GM-supplied pack is a
 post-Phase-4 idea and would need sandboxing review before it is entertained —
 a pack is data today precisely so that it has no way to execute anything.

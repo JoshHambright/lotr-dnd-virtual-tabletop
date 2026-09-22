@@ -97,7 +97,15 @@ export type Field =
   | { kind: 'longtext'; key: string; label: string }
   | { kind: 'number'; key: string; label: string; min?: number; max?: number; derived?: Formula }
   | { kind: 'toggle'; key: string; label: string }
-  | { kind: 'select'; key: string; label: string; options: string[]; allowCustom: boolean }
+  | {
+      kind: 'select'
+      key: string
+      label: string
+      options: string[]
+      allowCustom: boolean
+      /** Optional: fill this field from another field's value. */
+      suggest?: Suggestion
+    }
   | {
       kind: 'abilityBlock'
       key: string
@@ -116,6 +124,22 @@ export type Field =
     }
   | { kind: 'track'; key: string; label: string; max?: Formula; resetOn?: string }
   | { kind: 'repeater'; key: string; label: string; fields: Field[]; roll?: RollMacro }
+
+/**
+ * "When Calling is Champion, the Shadow path is usually Lure of Secrets."
+ *
+ * A suggestion, not a rule: the field stays editable and the mapping is data,
+ * so a table that plays it differently is a one-line pack edit rather than an
+ * argument with the app. `unverified` is the honest case — we could not check
+ * the mapping against the book, and the sheet says so instead of asserting it.
+ */
+export interface Suggestion {
+  /** The field whose value drives the suggestion. */
+  fromKey: string
+  /** That field's value -> the value suggested here. */
+  map: Record<string, string>
+  unverified?: boolean
+}
 
 export interface RollMacro {
   label: string

@@ -112,6 +112,11 @@ export const opSchema = z.discriminatedUnion('t', [
     patch: z
       .object({
         name: shortText,
+        rulesetId: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-z][a-z0-9-]*$/i),
         playersCanMoveAnyToken: z.boolean(),
         playersCanCreateTokens: z.boolean(),
       })
