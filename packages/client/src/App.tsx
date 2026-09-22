@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { TableClient } from './client.js'
 import type { Joined } from './components/JoinScreen.js'
-import { JoinScreen, gmKeyFor } from './components/JoinScreen.js'
+import { JoinScreen, gmKeyFor, rememberedName } from './components/JoinScreen.js'
 import { MapView } from './components/MapView.js'
 import type { Tool } from './components/MapView.js'
 import { DicePanel } from './components/DicePanel.js'
@@ -22,10 +22,11 @@ import { DiceTray } from './components/DiceTray.js'
 import { GridCalibrator } from './components/GridCalibrator.js'
 import type { Rect } from './view.js'
 import { getImage, solveGrid } from './view.js'
-import { assetUrl } from './api.js'
+import { assetUrl, roomExists } from './api.js'
 import { detectGridInImage } from './gridDetect.js'
 import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
+import { isValidRoomCode } from '@vtt/protocol'
 import { newId } from './ids.js'
 
 type Tab = 'dice' | 'sheets' | 'maps' | 'bestiary' | 'talk'
@@ -35,7 +36,36 @@ export function App() {
   const initialCode = useMemo(() => new URLSearchParams(location.search).get('table')?.toUpperCase() ?? '', [])
 
   // A link with ?table=CODE joins straight away if this browser has been here
-  // before, which is the common case on session night.
+  // before, which is the common case on session night — and on every refresh.
+  // Without this a reload lands on the join screen, where "open a table" is
+  // one click away and quietly starts a fresh, empty one.
+  const canRejoin = isValidRoomCode(initialCode) && rememberedName() !== ''
+  const [rejoining, setRejoining] = useState(canRejoin)
+
+  useEffect(() => {
+    if (!canRejoin) return
+    let cancelled = false
+    void roomExists(initialCode).then((exists) => {
+      if (cancelled) return
+      if (exists) setJoined({ code: initialCode, name: rememberedName(), gmKey: gmKeyFor(initialCode) })
+      setRejoining(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canRejoin, initialCode])
+
+  if (rejoining) {
+    return (
+      <main className="join">
+        <div className="join__card">
+          <h1>Middle-earth Table</h1>
+          <p className="join__blurb">Rejoining {initialCode}…</p>
+        </div>
+      </main>
+    )
+  }
+
   if (!joined) {
     return (
       <JoinScreen
@@ -48,7 +78,14 @@ export function App() {
     )
   }
 
-  return <Table key={joined.code + joined.name} joined={joined} onLeave={() => setJoined(null)} />
+  // Leaving on purpose forgets the table in the URL too, so a later refresh
+  // does not walk straight back in.
+  const leave = () => {
+    history.replaceState(null, '', location.pathname)
+    setJoined(null)
+  }
+
+  return <Table key={joined.code + joined.name} joined={joined} onLeave={leave} />
 }
 
 export function Table({

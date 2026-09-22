@@ -19,6 +19,15 @@ export interface Joined {
 
 const NAME_KEY = 'met.name'
 
+/** The name this browser last joined with, if any. */
+export function rememberedName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export function gmKeyFor(code: string): string | null {
   try {
     return localStorage.getItem(`met.gm.${code}`)
@@ -36,13 +45,7 @@ export function rememberGmKey(code: string, key: string): void {
 }
 
 export function JoinScreen({ initialCode, onJoin }: { initialCode: string; onJoin: (joined: Joined) => void }) {
-  const [name, setName] = useState(() => {
-    try {
-      return localStorage.getItem(NAME_KEY) ?? ''
-    } catch {
-      return ''
-    }
-  })
+  const [name, setName] = useState(rememberedName)
   const [code, setCode] = useState(initialCode)
   const [tableName, setTableName] = useState('')
   const [busy, setBusy] = useState(false)
