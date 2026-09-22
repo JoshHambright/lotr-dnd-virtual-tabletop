@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@vtt/formula": "workspace:*"
+    "@vtt/formula": "workspace:*",
+    "zod": "^3.25.76"
   }
 }

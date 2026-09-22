@@ -50,11 +50,9 @@ export type Scope = Record<string, unknown>
 
 export class FormulaError extends Error {}
 
-/**
- * The two functions workstream B implements. Declared here so every other
- * workstream can code against the signatures before the bodies exist.
- */
 export type ParseFormula = (source: Formula) => Ast
 export type EvaluateFormula = (source: Formula, scope: Scope) => number
 
 export * from './conformance.js'
+export { parse } from './parse.js'
+export { evaluate, evaluateAst } from './evaluate.js'

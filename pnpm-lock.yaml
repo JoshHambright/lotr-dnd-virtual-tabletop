@@ -128,6 +128,9 @@ importers:
       '@vtt/formula':
         specifier: workspace:*
         version: link:../formula
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
   packages/server:
     dependencies:
