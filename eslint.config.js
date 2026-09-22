@@ -30,6 +30,29 @@ export default tseslint.config(
     },
   },
 
+  // pdf.js is ~150 KB gzipped and must stay off the startup path. A *value*
+  // import of pdf.ts is a static dependency however lazily the rest of the
+  // module is used, so only `import type` and `await import()` are allowed.
+  // This was documented in CLAUDE.md and regressed anyway; hence a rule.
+  {
+    files: ['packages/client/src/**/*.{ts,tsx}'],
+    ignores: ['packages/client/src/pdf.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/pdf.js'],
+              allowTypeImports: true,
+              message: 'Load pdf.ts with await import(); a value import puts pdf.js in the startup bundle.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Scripts are operator tools; printing is the point.
   {
     files: ['scripts/**/*.{js,mjs}', '**/build.mjs'],

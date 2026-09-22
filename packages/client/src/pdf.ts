@@ -79,7 +79,3 @@ function document_createCanvas(width: number, height: number): HTMLCanvasElement
   canvas.height = height
   return canvas
 }
-
-export function isPdf(file: File): boolean {
-  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
-}

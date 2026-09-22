@@ -6,3 +6,4 @@ dist-demo/
 .wrangler/
 .dev.vars
 *.local
+coverage/

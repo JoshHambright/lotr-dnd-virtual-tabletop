@@ -11,7 +11,6 @@ import type { Scene } from '@vtt/core'
 import { newScene } from '@vtt/core'
 import { revealedFraction } from '@vtt/core'
 import { uploadAsset, uploadBlob } from '../api.js'
-import { isPdf } from '../pdf.js'
 import type { LoadedPdf } from '../pdf.js'
 import type { TableClient } from '../client.js'
 import { newId } from '../ids.js'
@@ -34,6 +33,15 @@ function cleanName(filename: string): string {
       .replace(/[_-]+/g, ' ')
       .trim() || 'Map'
   )
+}
+
+/**
+ * Deliberately here rather than in pdf.ts: importing a *value* from that module
+ * makes it a static dependency, which drags a megabyte of pdf.js into the
+ * startup bundle for every table that never opens a PDF.
+ */
+function isPdf(file: File): boolean {
+  return file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
 }
 
 export function ScenesPanel({
