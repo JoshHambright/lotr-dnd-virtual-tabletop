@@ -114,7 +114,7 @@ export const lotr5e: RulesetPack = {
           { kind: 'select', key: 'culture', label: 'Heroic Culture', options: HEROIC_CULTURES, allowCustom: true },
           { kind: 'select', key: 'calling', label: 'Calling', options: CALLINGS, allowCustom: true },
           { kind: 'number', key: 'level', label: 'Level', min: 1, max: 20 },
-          { kind: 'number', key: 'proficiency', label: 'Proficiency', derived: '2 + floor((@level - 1) / 4)' },
+          { kind: 'number', key: 'proficiency', label: 'Proficiency', derived: '2 + floor((max(1, @level) - 1) / 4)' },
           {
             kind: 'select',
             key: 'standardOfLiving',
@@ -296,6 +296,7 @@ export const lotr5e: RulesetPack = {
 
   tokenDefaults: {
     squares: 1,
+    hpTrack: 'hp',
     colors: ['#c8a45c', '#7d9a5e', '#b8543f', '#6f9bd1', '#9a7bb8', '#c07f3f', '#8fa8a0', '#b0b6bd'],
     showHpToPlayers: false,
   },

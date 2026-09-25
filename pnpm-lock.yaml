@@ -125,6 +125,9 @@ importers:
 
   packages/rulesets:
     dependencies:
+      '@vtt/dice':
+        specifier: workspace:*
+        version: link:../dice
       '@vtt/formula':
         specifier: workspace:*
         version: link:../formula

@@ -1,5 +1,6 @@
 /**
- * A character sheet the whole table can see.
+ * A character sheet the whole table can see — drawn from the pack, not from a
+ * component that knows what game this is.
  *
  * Everything on it rolls: clicking an ability or a skill sends the roll to the
  * shared log rather than opening a private calculator, which is the point of
@@ -9,32 +10,34 @@
  * is a sheet that ends the session out of date.
  */
 
-import { useEffect, useId as useReactId, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Character } from '@vtt/core'
-import {
-  ABILITIES,
-  ABILITY_NAMES,
-  CALLINGS,
-  HEROIC_CULTURES,
-  JOURNEY_ROLES,
-  SHADOW_PATHS,
-  SKILLS,
-  STANDARDS_OF_LIVING,
-  abilityModifier,
-  formatModifier,
-  proficiencyBonus,
-} from '@vtt/rulesets'
+import type { Field, RollMacro, RulesetPack, Section } from '@vtt/rulesets'
+import { deriveSheet, resolveMacro } from '@vtt/rulesets'
 import type { TableClient } from '../client.js'
+import {
+  AbilityBlockField,
+  LongTextField,
+  NumberField,
+  RepeaterField,
+  SelectField,
+  SkillListField,
+  TextField,
+  ToggleField,
+  TrackField,
+  asText,
+} from './SheetFields.js'
 
 const SAVE_DEBOUNCE_MS = 400
 
 interface Props {
   client: TableClient
+  pack: RulesetPack
   character: Character
   editable: boolean
 }
 
-export function CharacterSheet({ client, character, editable }: Props) {
+export function CharacterSheet({ client, pack, character, editable }: Props) {
   const [draft, setDraft] = useState(character)
   const dirtyRef = useRef(false)
 
@@ -53,393 +56,215 @@ export function CharacterSheet({ client, character, editable }: Props) {
     return () => clearTimeout(timer)
   }, [client, draft])
 
-  const update = (patch: Partial<Character>) => {
+  const sheet = useMemo(() => deriveSheet(pack, draft.values), [pack, draft.values])
+
+  const setValue = (key: string, value: unknown) => {
     if (!editable) return
     dirtyRef.current = true
-    setDraft((current) => ({ ...current, ...patch }))
+    setDraft((current) => ({ ...current, values: { ...current.values, [key]: value } }))
   }
 
-  const proficiency = proficiencyBonus(draft.level)
-  const weariness = draft.weary ? ' (Weary)' : ''
+  const setName = (name: string) => {
+    if (!editable) return
+    dirtyRef.current = true
+    setDraft((current) => ({ ...current, name }))
+  }
 
-  const rollAbility = (key: string) => {
-    const modifier = abilityModifier(draft.abilities[key] ?? 10)
-    client.roll(
-      `1d20${formatModifier(modifier)}`,
-      `${draft.name} — ${ABILITY_NAMES[key as never] ?? key}`,
-      'normal',
-      'public',
+  /**
+   * Rolls a field's macro.
+   *
+   * `@total` is the modifier the field just computed; everything else on the
+   * sheet is in scope too, so a pack can write a macro against any of it.
+   */
+  const roll = (macro: RollMacro, rowLabel: string, total: number) => {
+    const active = activeModifiers(pack, draft.values)
+    const bonus = active.reduce(
+      (sum, modifier) => sum + (modifier.effect.kind === 'bonus' ? modifier.effect.value : 0),
+      0,
     )
-  }
 
-  const rollSkill = (key: string, name: string, ability: string) => {
-    const rank = draft.skillProficiency[key] ?? 0
-    const modifier = abilityModifier(draft.abilities[ability] ?? 10) + proficiency * rank
-    client.roll(`1d20${formatModifier(modifier)}`, `${draft.name} — ${name}${weariness}`, 'normal', 'public')
+    let expression: string
+    try {
+      expression = resolveMacro(macro, { ...draft.values, ...sheet.derived, total: total + bonus })
+    } catch {
+      // A macro the dice parser refuses is a pack bug, not the table's problem.
+      return
+    }
+
+    const notes = active
+      .filter((modifier) => modifier.effect.kind !== 'bonus')
+      .map((modifier) => (modifier.unverified ? `${modifier.label}?` : modifier.label))
+    const suffix = notes.length ? ` (${notes.join(', ')})` : ''
+
+    client.roll(expression, `${draft.name} — ${rowLabel}${suffix}`, 'normal', macro.visibility ?? 'public')
   }
 
   return (
     <div className="sheet">
       <div className="sheet__identity">
-        <Field label="Name" value={draft.name} onChange={(name) => update({ name })} readOnly={!editable} />
-        <Select
-          label="Heroic Culture"
-          value={draft.culture}
-          options={HEROIC_CULTURES}
-          onChange={(culture) => update({ culture })}
-          readOnly={!editable}
-        />
-        <Select
-          label="Calling"
-          value={draft.calling}
-          options={CALLINGS}
-          onChange={(calling) => update({ calling, shadowPath: SHADOW_PATHS[calling] ?? draft.shadowPath })}
-          readOnly={!editable}
-        />
-        <NumberField
-          label="Level"
-          value={draft.level}
-          min={1}
-          max={20}
-          onChange={(level) => update({ level })}
-          readOnly={!editable}
-        />
-        <div className="sheet__derived">
-          <span>Proficiency</span>
-          <strong>{formatModifier(proficiency)}</strong>
+        <div className="field">
+          <label htmlFor={`${draft.id}-name`}>Name</label>
+          <input
+            id={`${draft.id}-name`}
+            className="input"
+            value={draft.name}
+            readOnly={!editable}
+            onChange={(event) => setName(event.target.value)}
+          />
         </div>
       </div>
 
-      <section className="sheet__section">
-        <h3>Abilities</h3>
-        <div className="sheet__abilities">
-          {ABILITIES.map((key) => {
-            const score = draft.abilities[key] ?? 10
-            return (
-              <div key={key} className="ability">
-                <label htmlFor={`${draft.id}-${key}`}>{ABILITY_NAMES[key]}</label>
-                <input
-                  id={`${draft.id}-${key}`}
-                  className="ability__score"
-                  type="number"
-                  value={score}
-                  readOnly={!editable}
-                  onChange={(event) => update({ abilities: { ...draft.abilities, [key]: Number(event.target.value) } })}
-                />
-                <button type="button" className="ability__mod" onClick={() => rollAbility(key)}>
-                  {formatModifier(abilityModifier(score))}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </section>
+      {pack.sheet.sections.map((section) => (
+        <SheetSection
+          key={section.id}
+          section={section}
+          sheet={sheet}
+          values={draft.values}
+          editable={editable}
+          onChange={setValue}
+          onRoll={roll}
+        />
+      ))}
 
-      <section className="sheet__section">
-        <h3>Standing</h3>
-        <div className="sheet__grid">
-          <NumberField
-            label="Hit points"
-            value={draft.currentHp}
-            onChange={(currentHp) => update({ currentHp })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Maximum"
-            value={draft.maxHp}
-            onChange={(maxHp) => update({ maxHp })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Temporary"
-            value={draft.tempHp}
-            onChange={(tempHp) => update({ tempHp })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Armour class"
-            value={draft.armourClass}
-            onChange={(armourClass) => update({ armourClass })}
-            readOnly={!editable}
-          />
-          <NumberField label="Speed" value={draft.speed} onChange={(speed) => update({ speed })} readOnly={!editable} />
-        </div>
-      </section>
-
-      <section className="sheet__section sheet__section--shadow">
-        <h3>Hope and Shadow</h3>
-        <div className="sheet__grid">
-          <NumberField label="Hope" value={draft.hope} onChange={(hope) => update({ hope })} readOnly={!editable} />
-          <NumberField
-            label="Hope maximum"
-            value={draft.maxHope}
-            onChange={(maxHope) => update({ maxHope })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Shadow points"
-            value={draft.shadow}
-            onChange={(shadow) => update({ shadow })}
-            readOnly={!editable}
-          />
-          <Field
-            label="Shadow path"
-            value={draft.shadowPath}
-            onChange={(shadowPath) => update({ shadowPath })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Valour"
-            value={draft.valour}
-            onChange={(valour) => update({ valour })}
-            readOnly={!editable}
-          />
-          <NumberField
-            label="Wisdom"
-            value={draft.wisdom}
-            onChange={(wisdom) => update({ wisdom })}
-            readOnly={!editable}
-          />
-        </div>
-        <div className="sheet__conditions">
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={draft.weary}
-              disabled={!editable}
-              onChange={(event) => update({ weary: event.target.checked })}
-            />
-            Weary
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={draft.miserable}
-              disabled={!editable}
-              onChange={(event) => update({ miserable: event.target.checked })}
-            />
-            Miserable
-          </label>
-        </div>
-      </section>
-
-      <section className="sheet__section">
-        <h3>Skills</h3>
-        <ul className="skills">
-          {SKILLS.map((skill) => {
-            const rank = draft.skillProficiency[skill.key] ?? 0
-            const modifier = abilityModifier(draft.abilities[skill.ability] ?? 10) + proficiency * rank
-            return (
-              <li key={skill.key} className="skill">
-                <button
-                  type="button"
-                  className="skill__rank"
-                  disabled={!editable}
-                  title="None, proficient, expertise"
-                  onClick={() =>
-                    update({ skillProficiency: { ...draft.skillProficiency, [skill.key]: (rank + 1) % 3 } })
-                  }
-                >
-                  {rank === 0 ? '○' : rank === 1 ? '◉' : '◎'}
-                </button>
-                <span className="skill__name">{skill.name}</span>
-                <span className="skill__ability">{skill.ability.toUpperCase()}</span>
-                <button
-                  type="button"
-                  className="skill__mod"
-                  onClick={() => rollSkill(skill.key, skill.name, skill.ability)}
-                >
-                  {formatModifier(modifier)}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-
-      <section className="sheet__section">
-        <h3>In the world</h3>
-        <div className="sheet__grid">
-          <Select
-            label="Standard of living"
-            value={draft.standardOfLiving}
-            options={STANDARDS_OF_LIVING}
-            onChange={(standardOfLiving) => update({ standardOfLiving })}
-            readOnly={!editable}
-          />
-          <Select
-            label="Journey role"
-            value={draft.journeyRole}
-            options={JOURNEY_ROLES}
-            onChange={(journeyRole) => update({ journeyRole })}
-            readOnly={!editable}
-          />
-          <Field label="Patron" value={draft.patron} onChange={(patron) => update({ patron })} readOnly={!editable} />
-          <Field
-            label="Treasure"
-            value={draft.treasure}
-            onChange={(treasure) => update({ treasure })}
-            readOnly={!editable}
-          />
-        </div>
-      </section>
-
-      <Text label="Virtues" value={draft.virtues} onChange={(virtues) => update({ virtues })} readOnly={!editable} />
-      <Text label="Rewards" value={draft.rewards} onChange={(rewards) => update({ rewards })} readOnly={!editable} />
-      <Text
-        label="Features and feats"
-        value={draft.features}
-        onChange={(features) => update({ features })}
-        readOnly={!editable}
-      />
-      <Text
-        label="Equipment"
-        value={draft.equipment}
-        onChange={(equipment) => update({ equipment })}
-        readOnly={!editable}
-      />
-      <Text label="Notes" value={draft.notes} onChange={(notes) => update({ notes })} readOnly={!editable} />
+      {sheet.problems.length ? (
+        <p className="hint hint--warn">
+          This sheet has a formula it cannot work out: {sheet.problems.join('; ')}. The numbers it feeds are showing 0.
+        </p>
+      ) : null}
 
       {client.role === 'gm' ? (
-        <Text
-          label="GM notes (only you can see these)"
-          value={draft.gmNotes}
-          onChange={(gmNotes) => update({ gmNotes })}
-          readOnly={false}
-        />
+        <div className="field field--wide">
+          <label htmlFor={`${draft.id}-gm-notes`}>GM notes (only you can see these)</label>
+          <textarea
+            id={`${draft.id}-gm-notes`}
+            className="input input--area"
+            value={draft.gmNotes}
+            onChange={(event) => {
+              dirtyRef.current = true
+              setDraft((current) => ({ ...current, gmNotes: event.target.value }))
+            }}
+          />
+        </div>
       ) : null}
+
+      <p className="hint">
+        {pack.name} · {pack.licence.name}
+      </p>
     </div>
   )
 }
 
-// --- Small form pieces -------------------------------------------------------
-
-function Field({
-  label,
-  value,
+function SheetSection({
+  section,
+  sheet,
+  values,
+  editable,
   onChange,
-  readOnly,
+  onRoll,
 }: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  readOnly: boolean
+  section: Section
+  sheet: ReturnType<typeof deriveSheet>
+  values: Record<string, unknown>
+  editable: boolean
+  onChange: (key: string, value: unknown) => void
+  onRoll: (macro: RollMacro, rowLabel: string, total: number) => void
 }) {
-  const id = useId(label)
+  // Blocks lay themselves out; loose fields share a grid.
+  const grid = section.fields.filter((field) => !SELF_LAYING_OUT.has(field.kind))
+  const blocks = section.fields.filter((field) => SELF_LAYING_OUT.has(field.kind))
+
   return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        className="input"
-        value={value}
-        readOnly={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
+    <section className={`sheet__section${section.tone ? ` sheet__section--${section.tone}` : ''}`}>
+      <h3>{section.title}</h3>
+      {grid.length ? (
+        <div className="sheet__grid">
+          {grid.map((field) => (
+            <SheetField
+              key={field.key}
+              field={field}
+              sheet={sheet}
+              values={values}
+              editable={editable}
+              onChange={onChange}
+              onRoll={onRoll}
+            />
+          ))}
+        </div>
+      ) : null}
+      {blocks.map((field) => (
+        <SheetField
+          key={field.key}
+          field={field}
+          sheet={sheet}
+          values={values}
+          editable={editable}
+          onChange={onChange}
+          onRoll={onRoll}
+        />
+      ))}
+    </section>
   )
 }
 
-function NumberField({
-  label,
-  value,
+const SELF_LAYING_OUT = new Set<Field['kind']>(['abilityBlock', 'skillList', 'repeater', 'longtext'])
+
+function SheetField({
+  field,
+  sheet,
+  values,
+  editable,
   onChange,
-  readOnly,
-  min,
-  max,
+  onRoll,
 }: {
-  label: string
-  value: number
-  onChange: (value: number) => void
-  readOnly: boolean
-  min?: number
-  max?: number
+  field: Field
+  sheet: ReturnType<typeof deriveSheet>
+  values: Record<string, unknown>
+  editable: boolean
+  onChange: (key: string, value: unknown) => void
+  onRoll: (macro: RollMacro, rowLabel: string, total: number) => void
 }) {
-  const id = useId(label)
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        className="input"
-        type="number"
-        value={value}
-        readOnly={readOnly}
-        {...(min !== undefined ? { min } : {})}
-        {...(max !== undefined ? { max } : {})}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </div>
-  )
+  // `field` is passed into each case rather than spread from a shared object,
+  // so the switch narrows it and each component gets the kind it declares.
+  const common = {
+    value: values[field.key],
+    readOnly: !editable,
+    onChange: (value: unknown) => onChange(field.key, value),
+  }
+
+  switch (field.kind) {
+    case 'text':
+      return <TextField {...common} field={field} />
+    case 'longtext':
+      return <LongTextField {...common} field={field} />
+    case 'number':
+      return <NumberField {...common} field={field} derived={sheet.derived[field.key]} />
+    case 'toggle':
+      return <ToggleField {...common} field={field} />
+    case 'select':
+      return <SelectField {...common} field={field} suggestion={suggestionFor(field, values)} />
+    case 'abilityBlock':
+      return <AbilityBlockField {...common} field={field} views={sheet.abilities[field.key] ?? []} onRoll={onRoll} />
+    case 'skillList':
+      return <SkillListField {...common} field={field} views={sheet.skills[field.key] ?? []} onRoll={onRoll} />
+    case 'track':
+      return <TrackField {...common} field={field} derivedMax={sheet.trackMax[field.key]} />
+    case 'repeater':
+      return <RepeaterField {...common} field={field} onRoll={onRoll} />
+  }
 }
 
-function Select({
-  label,
-  value,
-  options,
-  onChange,
-  readOnly,
-}: {
-  label: string
-  value: string
-  options: readonly string[]
-  onChange: (value: string) => void
-  readOnly: boolean
-}) {
-  const id = useId(label)
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        className="input"
-        value={value}
-        disabled={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">—</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-        {value && !options.includes(value) ? <option value={value}>{value}</option> : null}
-      </select>
-    </div>
-  )
-}
-
-function Text({
-  label,
-  value,
-  onChange,
-  readOnly,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  readOnly: boolean
-}) {
-  const id = useId(label)
-  return (
-    <div className="field field--wide">
-      <label htmlFor={id}>{label}</label>
-      <textarea
-        id={id}
-        className="input input--area"
-        value={value}
-        readOnly={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </div>
-  )
+function suggestionFor(field: Extract<Field, { kind: 'select' }>, values: Record<string, unknown>): string | undefined {
+  if (!field.suggest) return undefined
+  return field.suggest.map[asText(values[field.suggest.fromKey])]
 }
 
 /**
- * Stable per-instance ids so a label points at its own control even when two
- * sheets are open. React supplies the unique part; the seed only makes the id
- * readable in the DOM inspector.
+ * Which of the pack's roll modifiers apply right now.
+ *
+ * Only `bonus` is actually applied to the roll — it is arithmetic. The other
+ * two need the dice engine to know about rerolls and floors, so for now they
+ * are named on the roll instead, which is at least honest at the table (D-022).
  */
-function useId(seed: string): string {
-  return `${seed.replace(/\W+/g, '-').toLowerCase()}-${useReactId()}`
+function activeModifiers(pack: RulesetPack, values: Record<string, unknown>) {
+  return (pack.dice.modifiers ?? []).filter((modifier) => Boolean(values[modifier.whenField]))
 }

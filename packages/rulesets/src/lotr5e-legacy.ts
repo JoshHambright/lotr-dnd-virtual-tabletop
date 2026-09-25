@@ -1,5 +1,9 @@
 /**
- * Data for The Lord of the Rings Roleplaying (Free League, 5e).
+ * The old hardcoded LotR data.
+ *
+ * Superseded for character sheets by `packs/lotr5e` — what is left is what the
+ * bestiary still leans on. Stat blocks have not been moved to the pack format
+ * yet; when they are, this file goes.
  *
  * The 5e chassis is standard — six abilities, proficiency bonus, the usual
  * skill list — so only the Middle-earth layer is spelled out here. Anything
@@ -72,8 +76,4 @@ export function abilityModifier(score: number): number {
 
 export function proficiencyBonus(level: number): number {
   return 2 + Math.floor((Math.max(1, Math.min(20, level)) - 1) / 4)
-}
-
-export function formatModifier(n: number): string {
-  return n >= 0 ? `+${n}` : `${n}`
 }

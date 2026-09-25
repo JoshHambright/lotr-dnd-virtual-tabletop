@@ -158,6 +158,14 @@ export interface TokenDefaults {
   squares: number
   colors: string[]
   showHpToPlayers: boolean
+  /**
+   * The `track` field whose value a token's hit points come from.
+   *
+   * Optional because not every system has one — a pack that omits it gets
+   * tokens with no hit points rather than a wrong guess about which number on
+   * the sheet is the one that kills you.
+   */
+  hpTrack?: string
 }
 
 /** Bundled game content, where a licence allows it to ship. */

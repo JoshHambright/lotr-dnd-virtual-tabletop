@@ -24,33 +24,41 @@ export function seedDemoRoom(): RoomState {
   const weathertop = newScene('weathertop', 'Weathertop, after dark', 1400, 1000, null)
   weathertop.gmNotes = 'Five Nazgûl close in from the east once the fire is lit.'
 
+  // Sheets are a value bag the pack defines; these keys are `lotr5e`'s.
   const frodo = {
     ...newCharacter('c-frodo', 'Frodo', 'You'),
-    culture: 'Hobbits of the Shire',
-    calling: 'Treasure Hunter',
+    gmNotes: 'He is bearing the Ring. Tempt him when the company is cornered.',
+    values: {
+      culture: 'Hobbits of the Shire',
+      calling: 'Treasure Hunter',
+      level: 3,
+      abilities: { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 },
+      skillProficiency: { stealth: 2, perception: 1, insight: 1 },
+      hp: { value: 17, max: 22 },
+      armourClass: 13,
+      speed: 25,
+      hope: { value: 3, max: 3 },
+      shadow: 1,
+      shadowPath: 'Dragon-sickness',
+      standardOfLiving: 'Frugal',
+      journeyRole: 'Scout',
+      equipment: 'Sting, mithril shirt (unworn), a letter from Gandalf',
+      attacks: [{ name: 'Sting', bonus: 5, damage: '1d6+3', notes: 'Glows near orcs' }],
+    },
   }
-  frodo.level = 3
-  frodo.abilities = { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 }
-  frodo.skillProficiency = { stealth: 2, perception: 1, insight: 1 }
-  frodo.maxHp = 22
-  frodo.currentHp = 17
-  frodo.armourClass = 13
-  frodo.speed = 25
-  frodo.hope = 3
-  frodo.maxHope = 3
-  frodo.shadow = 1
-  frodo.shadowPath = 'Dragon-sickness'
-  frodo.standardOfLiving = 'Frugal'
-  frodo.journeyRole = 'Scout'
-  frodo.equipment = 'Sting, mithril shirt (unworn), a letter from Gandalf'
-  frodo.gmNotes = 'He is bearing the Ring. Tempt him when the company is cornered.'
 
-  const sam = { ...newCharacter('c-sam', 'Sam', 'Sam'), culture: 'Hobbits of the Shire', calling: 'Warden' }
-  sam.level = 3
-  sam.abilities = { str: 12, dex: 12, con: 14, int: 9, wis: 13, cha: 11 }
-  sam.maxHp = 26
-  sam.currentHp = 26
-  sam.armourClass = 14
+  const sam = {
+    ...newCharacter('c-sam', 'Sam', 'Sam'),
+    values: {
+      culture: 'Hobbits of the Shire',
+      calling: 'Warden',
+      level: 3,
+      abilities: { str: 12, dex: 12, con: 14, int: 9, wis: 13, cha: 11 },
+      hp: { value: 26, max: 26 },
+      armourClass: 14,
+      hope: { value: 2, max: 3 },
+    },
+  }
 
   const ops: Op[] = [
     { t: 'settings.update', patch: { name: 'The Ring Goes South' } },

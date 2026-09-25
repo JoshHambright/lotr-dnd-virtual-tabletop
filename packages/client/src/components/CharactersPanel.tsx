@@ -5,22 +5,27 @@
  */
 
 import type { Character, Scene } from '@vtt/core'
-import { newCharacter, newToken } from '@vtt/core'
+import { identityFor, newCharacter, newToken } from '@vtt/core'
+import type { RulesetPack } from '@vtt/rulesets'
+import { asTrack } from './SheetFields.js'
 import type { TableClient } from '../client.js'
 import { CharacterSheet } from './CharacterSheet.js'
 import { newId } from '../ids.js'
 
 interface Props {
   client: TableClient
+  pack: RulesetPack
   characters: Character[]
   scene: Scene | null
   openId: string | null
   onOpen: (id: string | null) => void
 }
 
-export function CharactersPanel({ client, characters, scene, openId, onOpen }: Props) {
+export function CharactersPanel({ client, pack, characters, scene, openId, onOpen }: Props) {
+  // Ownership is checked by id, never by name. See CLAUDE.md and D-017.
+  const me = identityFor(client.name)
   const open = characters.find((character) => character.id === openId) ?? null
-  const mine = characters.filter((character) => character.ownerName === client.name)
+  const mine = characters.filter((character) => character.ownerId === me)
 
   const create = () => {
     const id = newId()
@@ -30,13 +35,16 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
 
   const placeOnMap = (character: Character) => {
     if (!scene) return
+    // The pack says which track is hit points; a pack that names none gets a
+    // token with no bar rather than a guess about which number matters.
+    const track = pack.tokenDefaults.hpTrack ? asTrack(character.values[pack.tokenDefaults.hpTrack]) : null
     client.send({
       t: 'token.create',
       token: newToken(newId(), scene.id, scene.width / 2, scene.height / 2, {
         label: character.name,
         characterId: character.id,
-        hp: character.currentHp,
-        maxHp: character.maxHp,
+        hp: track ? track.value : null,
+        maxHp: track ? track.max : null,
         imageAssetId: character.portraitAssetId,
       }),
     })
@@ -52,7 +60,7 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
 
       <ul className="scene-list">
         {characters.map((character) => {
-          const isMine = character.ownerName === client.name
+          const isMine = character.ownerId === me
           return (
             <li key={character.id} className={character.id === openId ? 'scene-list__item--editing' : undefined}>
               <button
@@ -62,7 +70,7 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
               >
                 {character.name}
                 <span className="hint">
-                  {[character.culture, character.calling].filter(Boolean).join(' · ') || 'Unwritten'}
+                  {summarise(pack, character) || 'Unwritten'}
                   {isMine ? ' · yours' : ` · ${character.ownerName}`}
                 </span>
               </button>
@@ -84,10 +92,11 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
         <>
           <CharacterSheet
             client={client}
+            pack={pack}
             character={open}
-            editable={client.role === 'gm' || open.ownerName === client.name}
+            editable={client.role === 'gm' || open.ownerId === me}
           />
-          {client.role === 'gm' || open.ownerName === client.name ? (
+          {client.role === 'gm' || open.ownerId === me ? (
             <button
               type="button"
               className="button button--danger button--small"
@@ -103,4 +112,23 @@ export function CharactersPanel({ client, characters, scene, openId, onOpen }: P
       ) : null}
     </div>
   )
+}
+
+/**
+ * A one-line description under a name in the list.
+ *
+ * Built from whichever of the pack's first two `select` fields the sheet has
+ * filled in — Culture and Calling in `lotr5e`, Class in another pack — because
+ * hardcoding "culture · calling" here would put the ruleset back in the app.
+ */
+function summarise(pack: RulesetPack, character: Character): string {
+  const selects = pack.sheet.sections
+    .flatMap((section) => section.fields)
+    .filter((field) => field.kind === 'select')
+    .slice(0, 2)
+
+  return selects
+    .map((field) => character.values[field.key])
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' · ')
 }

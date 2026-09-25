@@ -66,6 +66,25 @@ export interface Token {
   locked: boolean
 }
 
+/**
+ * A sheet's value bag.
+ *
+ * The app does not know what a character *has*; the pack does. Keys are field
+ * keys from the pack's `SheetSchema`, and the shape stored under each one is
+ * fixed per field kind — see docs/RULESET_PACKS.md, "What a field stores".
+ *
+ * Deliberately not a union of every pack's shape: the whole point is that a
+ * fourth ruleset is a new pack rather than a change to this file.
+ */
+export type CharacterValues = Record<string, unknown>
+
+/**
+ * A character sheet.
+ *
+ * Only the fields the *app* needs are named here — a name to put on a token, an
+ * owner to check, a portrait, and the GM's private annotations. Everything the
+ * game defines lives in `values`, keyed by the pack.
+ */
 export interface Character {
   id: string
   name: string
@@ -80,36 +99,8 @@ export interface Character {
    * is minted and nothing else. See `identityFor` and DECISIONS D-017.
    */
   ownerId: string
-  culture: string
-  calling: string
-  level: number
-  abilities: Record<string, number>
-  /** Skill key -> 0 none, 1 proficient, 2 expertise. */
-  skillProficiency: Record<string, number>
-  saveProficiency: Record<string, boolean>
-  maxHp: number
-  currentHp: number
-  tempHp: number
-  armourClass: number
-  speed: number
-  /** The Middle-earth layer. */
-  shadow: number
-  shadowPath: string
-  hope: number
-  maxHope: number
-  weary: boolean
-  miserable: boolean
-  standardOfLiving: string
-  patron: string
-  journeyRole: string
-  valour: number
-  wisdom: number
-  virtues: string
-  rewards: string
-  equipment: string
-  treasure: string
-  features: string
-  notes: string
+  /** Everything the ruleset defines. See `CharacterValues`. */
+  values: CharacterValues
   /** GM-only annotations on a player's sheet. */
   gmNotes: string
   portraitAssetId: string | null
@@ -210,7 +201,7 @@ export const DEFAULT_RULESET_ID = 'lotr5e'
  * any data worth migrating, because retrofitting a version field onto rooms
  * already on disk means guessing which shape each one is.
  */
-export const ROOM_SCHEMA_VERSION = 3
+export const ROOM_SCHEMA_VERSION = 4
 
 export interface RoomState {
   /** The schema this room was written with. See `migrateRoom`. */
@@ -443,40 +434,19 @@ export function newToken(id: string, sceneId: string, x: number, y: number, over
   }
 }
 
+/**
+ * A blank sheet.
+ *
+ * Blank really is blank: the pack decides what a field starts at, and a core
+ * that pre-filled six ability scores at 10 would be quietly asserting 5e.
+ */
 export function newCharacter(id: string, name: string, ownerName: string): Character {
   return {
     id,
     name,
     ownerName,
     ownerId: identityFor(ownerName),
-    culture: '',
-    calling: '',
-    level: 1,
-    abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    skillProficiency: {},
-    saveProficiency: {},
-    maxHp: 10,
-    currentHp: 10,
-    tempHp: 0,
-    armourClass: 10,
-    speed: 30,
-    shadow: 0,
-    shadowPath: '',
-    hope: 1,
-    maxHope: 1,
-    weary: false,
-    miserable: false,
-    standardOfLiving: '',
-    patron: '',
-    journeyRole: '',
-    valour: 1,
-    wisdom: 1,
-    virtues: '',
-    rewards: '',
-    equipment: '',
-    treasure: '',
-    features: '',
-    notes: '',
+    values: {},
     gmNotes: '',
     portraitAssetId: null,
   }
@@ -563,6 +533,70 @@ const ROOM_MIGRATIONS: Record<number, (room: RoomState) => RoomState> = {
     ...room,
     settings: { ...room.settings, rulesetId: room.settings.rulesetId || DEFAULT_RULESET_ID },
   }),
+
+  // Sheets stopped being LotR-shaped and became a value bag the pack defines.
+  // Every field is carried across under the key the `lotr5e` pack gives it, so
+  // a campaign written against the old sheet opens with nothing missing.
+  3: (room) => ({
+    ...room,
+    characters: Object.fromEntries(
+      Object.entries(room.characters).map(([id, character]) => [id, toValueBag(character)]),
+    ),
+  }),
+}
+
+/**
+ * The one place that still knows the old LotR-shaped sheet.
+ *
+ * Kept deliberately explicit rather than looping over the leftover keys: two of
+ * them change shape (hit points and Hope become tracks) and three are the app's
+ * own, so a generic "move everything across" would get them wrong and only show
+ * it at somebody's table.
+ */
+function toValueBag(stored: Character): Character {
+  const old = stored as Character & Record<string, unknown>
+  if (old.values && typeof old.values === 'object') return stored
+
+  const take = <T>(key: string, fallback: T): T => (old[key] === undefined ? fallback : (old[key] as T))
+  const values: CharacterValues = {
+    culture: take('culture', ''),
+    calling: take('calling', ''),
+    level: take('level', 1),
+    proficiency: 2 + Math.floor((Math.max(1, take('level', 1)) - 1) / 4),
+    standardOfLiving: take('standardOfLiving', ''),
+    patron: take('patron', ''),
+    journeyRole: take('journeyRole', ''),
+    abilities: take('abilities', {}),
+    skillProficiency: take('skillProficiency', {}),
+    hp: { value: take('currentHp', 0), max: take('maxHp', 0) },
+    tempHp: take('tempHp', 0),
+    armourClass: take('armourClass', 10),
+    speed: take('speed', 30),
+    attacks: [],
+    hope: { value: take('hope', 0), max: take('maxHope', 0) },
+    shadow: take('shadow', 0),
+    shadowPath: take('shadowPath', ''),
+    weary: take('weary', false),
+    miserable: take('miserable', false),
+    valour: take('valour', 0),
+    wisdom: take('wisdom', 0),
+    virtues: take('virtues', ''),
+    rewards: take('rewards', ''),
+    equipment: take('equipment', ''),
+    treasure: take('treasure', ''),
+    features: take('features', ''),
+    notes: take('notes', ''),
+  }
+
+  return {
+    id: stored.id,
+    name: stored.name,
+    ownerName: stored.ownerName,
+    ownerId: stored.ownerId,
+    values,
+    gmNotes: take('gmNotes', ''),
+    portraitAssetId: take('portraitAssetId', null),
+  }
 }
 
 /**

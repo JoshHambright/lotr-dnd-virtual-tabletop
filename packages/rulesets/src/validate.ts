@@ -174,6 +174,7 @@ export const packSchema = z.object({
     squares: z.number().min(0.25).max(16),
     colors: z.array(colour).min(1).max(24),
     showHpToPlayers: z.boolean(),
+    hpTrack: identifier.optional(),
   }),
 
   content: z
@@ -259,6 +260,11 @@ function crossCheck(pack: RulesetPack): void {
         }
       }
     }
+  }
+
+  const hpTrack = pack.tokenDefaults.hpTrack
+  if (hpTrack !== undefined && fields.get(hpTrack)?.kind !== 'track') {
+    fail(`takes token hit points from "${hpTrack}", which is not a track`)
   }
 
   for (const modifier of pack.dice.modifiers ?? []) {

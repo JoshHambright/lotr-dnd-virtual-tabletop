@@ -23,6 +23,7 @@ import { GridCalibrator } from './components/GridCalibrator.js'
 import type { Rect } from './view.js'
 import { getImage, solveGrid } from './view.js'
 import { assetUrl, roomExists } from './api.js'
+import { packFor } from './pack.js'
 import { detectGridInImage } from './gridDetect.js'
 import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
@@ -123,6 +124,7 @@ export function Table({
 
   const isGm = client.role === 'gm'
   const room = client.room
+  const { pack, missing: missingPack } = packFor(room.settings.rulesetId)
   const scenes = Object.values(room.scenes)
 
   // The GM looks at whichever scene they are editing; players always see the
@@ -301,6 +303,14 @@ export function Table({
         </div>
       ) : null}
 
+      {missingPack ? (
+        <div className="notice">
+          This table plays <strong>{missingPack}</strong>, which this copy of the app does not have. Sheets are being
+          drawn with <strong>{pack.name}</strong> instead, so some fields may be missing. Nothing already saved has been
+          changed.
+        </div>
+      ) : null}
+
       {isGm && editingSceneId && editingSceneId !== room.activeSceneId ? (
         <div className="notice">
           You are staging <strong>{room.scenes[editingSceneId]?.name}</strong>. The table is still looking at{' '}
@@ -426,6 +436,7 @@ export function Table({
             {tab === 'sheets' ? (
               <CharactersPanel
                 client={client}
+                pack={pack}
                 characters={Object.values(room.characters)}
                 scene={visibleScene}
                 openId={openCharacterId}
