@@ -11,8 +11,8 @@
  */
 
 import { FormulaError, evaluate } from '@vtt/formula'
-import { DiceError, parseExpression } from '@vtt/dice'
-import type { CharacterValues, Field, RollMacro, RulesetPack, Section } from './pack.js'
+import { DiceError, formatExpression, parseExpression } from '@vtt/dice'
+import type { CharacterValues, DiceProfile, Field, RollMacro, RollModifier, RulesetPack, Section } from './pack.js'
 
 export interface AbilityView {
   key: string
@@ -162,6 +162,64 @@ export function resolveMacro(macro: RollMacro | string, scope: Record<string, un
 
   parseExpression(folded)
   return folded
+}
+
+/**
+ * Which of a pack's roll modifiers are switched on by this character's values.
+ *
+ * Lives here rather than in the sheet component because what a condition does
+ * to a roll is the part worth testing, and testing it should not need a
+ * browser.
+ */
+export function activeModifiers(pack: RulesetPack, values: CharacterValues): RollModifier[] {
+  return (pack.dice.modifiers ?? []).filter((modifier) => Boolean(values[modifier.whenField]))
+}
+
+/** The part of a set of modifiers that a plain `+` already expresses. */
+export function modifierBonus(modifiers: RollModifier[]): number {
+  return modifiers.reduce((sum, modifier) => sum + (modifier.effect.kind === 'bonus' ? modifier.effect.value : 0), 0)
+}
+
+/**
+ * Writes the per-die modifiers into the expression itself.
+ *
+ * They have to travel as dice syntax because the server rolls every expression
+ * and the client only asks. A floor the browser applied to a number it had
+ * already worked out would be a result nobody else could check, which is the
+ * one thing this design exists to prevent (D-022).
+ *
+ * Only dice matching the profile's own die are touched. Weary is a rule about
+ * the check die; it has no opinion about the d6s of a damage roll that happens
+ * to share the expression, and flooring those would be inventing a rule rather
+ * than applying one.
+ */
+export function applyRollModifiers(expression: string, profile: DiceProfile, modifiers: RollModifier[]): string {
+  const perDie = modifiers.filter((modifier) => modifier.effect.kind !== 'bonus')
+  if (!perDie.length) return expression
+
+  const terms = parseExpression(expression)
+  let changed = false
+
+  for (const term of terms) {
+    if (term.kind !== 'dice' || term.dice.sides !== profile.defaultDie) continue
+    for (const { effect } of perDie) {
+      if (effect.kind === 'treat-below-as') {
+        term.dice.treatAtOrBelow = { threshold: effect.threshold, value: effect.value }
+      } else if (effect.kind === 'reroll-at-or-below') {
+        term.dice.rerollAtOrBelow = effect.threshold
+      }
+      changed = true
+    }
+  }
+
+  if (!changed) return expression
+
+  const rewritten = formatExpression(terms)
+  // A pack can declare a threshold the die cannot express — t20a0 on a d20.
+  // Better to refuse the roll here, where the caller already treats a parse
+  // failure as a pack bug, than to send the table something unrollable.
+  parseExpression(rewritten)
+  return rewritten
 }
 
 /** Depth-first over every field, stepping into repeater rows. */

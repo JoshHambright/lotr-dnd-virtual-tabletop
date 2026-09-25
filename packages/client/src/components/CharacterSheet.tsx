@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Character } from '@vtt/core'
 import type { Field, RollMacro, RulesetPack, Section } from '@vtt/rulesets'
-import { deriveSheet, resolveMacro } from '@vtt/rulesets'
+import { activeModifiers, applyRollModifiers, deriveSheet, modifierBonus, resolveMacro } from '@vtt/rulesets'
 import type { TableClient } from '../client.js'
 import {
   AbilityBlockField,
@@ -78,19 +78,21 @@ export function CharacterSheet({ client, pack, character, editable }: Props) {
    */
   const roll = (macro: RollMacro, rowLabel: string, total: number) => {
     const active = activeModifiers(pack, draft.values)
-    const bonus = active.reduce(
-      (sum, modifier) => sum + (modifier.effect.kind === 'bonus' ? modifier.effect.value : 0),
-      0,
-    )
 
     let expression: string
     try {
-      expression = resolveMacro(macro, { ...draft.values, ...sheet.derived, total: total + bonus })
+      // A bonus folds into the modifier the macro already references; the
+      // per-die rules cannot, so they are written into the expression and
+      // resolved by the server along with everything else.
+      const filled = resolveMacro(macro, { ...draft.values, ...sheet.derived, total: total + modifierBonus(active) })
+      expression = applyRollModifiers(filled, pack.dice, active)
     } catch {
       // A macro the dice parser refuses is a pack bug, not the table's problem.
       return
     }
 
+    // Still named as well as applied: the dice syntax says what happened, but
+    // the label is what tells the table *which rule* floored the roll.
     const notes = active
       .filter((modifier) => modifier.effect.kind !== 'bonus')
       .map((modifier) => (modifier.unverified ? `${modifier.label}?` : modifier.label))
@@ -256,15 +258,4 @@ function SheetField({
 function suggestionFor(field: Extract<Field, { kind: 'select' }>, values: Record<string, unknown>): string | undefined {
   if (!field.suggest) return undefined
   return field.suggest.map[asText(values[field.suggest.fromKey])]
-}
-
-/**
- * Which of the pack's roll modifiers apply right now.
- *
- * Only `bonus` is actually applied to the roll — it is arithmetic. The other
- * two need the dice engine to know about rerolls and floors, so for now they
- * are named on the roll instead, which is at least honest at the table (D-022).
- */
-function activeModifiers(pack: RulesetPack, values: Record<string, unknown>) {
-  return (pack.dice.modifiers ?? []).filter((modifier) => Boolean(values[modifier.whenField]))
 }

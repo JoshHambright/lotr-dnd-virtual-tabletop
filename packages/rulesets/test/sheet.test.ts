@@ -4,9 +4,17 @@
 
 import { describe, expect, it } from 'vitest'
 import { DiceError } from '@vtt/dice'
-import { deriveSheet, formatModifier, resolveMacro } from '../src/sheet.js'
+import { roll } from '@vtt/dice'
+import {
+  activeModifiers,
+  applyRollModifiers,
+  deriveSheet,
+  formatModifier,
+  modifierBonus,
+  resolveMacro,
+} from '../src/sheet.js'
 import { getPack } from '../src/registry.js'
-import type { RulesetPack } from '../src/pack.js'
+import type { DiceProfile, RollModifier, RulesetPack } from '../src/pack.js'
 
 const pack = getPack('lotr5e')
 
@@ -137,6 +145,66 @@ describe('resolveMacro', () => {
         if (macro) expect(() => resolveMacro(macro, scope)).not.toThrow()
       }
     }
+  })
+})
+
+describe('roll modifiers', () => {
+  const weary = pack.dice.modifiers?.[0] as RollModifier
+
+  const modifier = (effect: RollModifier['effect'], id = 'test'): RollModifier => ({
+    id,
+    label: id,
+    whenField: id,
+    effect,
+  })
+
+  it('switches a pack modifier on from the field it names', () => {
+    expect(activeModifiers(pack, frodo())).toEqual([])
+    expect(activeModifiers(pack, { ...frodo(), weary: true })).toEqual([weary])
+  })
+
+  it('sums only the modifiers a plain plus can express', () => {
+    const modifiers = [modifier({ kind: 'bonus', value: 2 }), weary, modifier({ kind: 'bonus', value: -1 })]
+    expect(modifierBonus(modifiers)).toBe(1)
+    expect(modifierBonus([weary])).toBe(0)
+  })
+
+  it('writes Weary into the expression rather than into a number', () => {
+    expect(applyRollModifiers('1d20+9', pack.dice, [weary])).toBe('1d20t3a0+9')
+  })
+
+  it('writes a reroll in the same way', () => {
+    const lucky = modifier({ kind: 'reroll-at-or-below', threshold: 1 })
+    expect(applyRollModifiers('1d20+3', pack.dice, [lucky])).toBe('1d20r1+3')
+  })
+
+  it('leaves an expression alone when nothing per-die is active', () => {
+    expect(applyRollModifiers('1d20+9', pack.dice, [])).toBe('1d20+9')
+    expect(applyRollModifiers('1d20+9', pack.dice, [modifier({ kind: 'bonus', value: 2 })])).toBe('1d20+9')
+  })
+
+  // Weary is a rule about the check die. A damage roll sharing the expression
+  // is not a check, and flooring its dice would be inventing a rule.
+  it('touches the profile die and leaves other dice alone', () => {
+    expect(applyRollModifiers('1d20+2d6+4', pack.dice, [weary])).toBe('1d20t3a0+2d6+4')
+    expect(applyRollModifiers('2d6+4', pack.dice, [weary])).toBe('2d6+4')
+  })
+
+  it('refuses a threshold the die cannot express instead of sending it to be rolled', () => {
+    const absurd = modifier({ kind: 'treat-below-as', threshold: 20, value: 0 })
+    expect(() => applyRollModifiers('1d20', pack.dice, [absurd])).toThrow()
+  })
+
+  it('produces something the server can actually roll', () => {
+    const expression = applyRollModifiers(resolveMacro('1d20 + @total', { total: 9 }), pack.dice, [weary])
+    const result = roll(expression, 'normal', () => 0)
+    // Every face is a 1, so Weary counts it as 0 and only the +9 survives.
+    expect(result.total).toBe(9)
+  })
+
+  it('carries the floor through a macro that already keeps dice', () => {
+    const profile: DiceProfile = { ...pack.dice, defaultDie: 6 }
+    expect(applyRollModifiers('4d6kh3', profile, [weary])).toBe('4d6kh3t3a0')
   })
 })
 
