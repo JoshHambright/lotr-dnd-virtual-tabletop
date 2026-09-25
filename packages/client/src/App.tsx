@@ -24,6 +24,7 @@ import type { Rect } from './view.js'
 import { getImage, solveGrid } from './view.js'
 import { assetUrl, roomExists } from './api.js'
 import { packFor } from './pack.js'
+import { applyTheme } from './theme.js'
 import { detectGridInImage } from './gridDetect.js'
 import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
@@ -125,6 +126,12 @@ export function Table({
   const isGm = client.role === 'gm'
   const room = client.room
   const { pack, missing: missingPack } = packFor(room.settings.rulesetId)
+
+  // The pack wears the app, rather than the app knowing what the pack is. See
+  // theme.ts — the tokens cascade, so no component has a conditional in it.
+  useEffect(() => {
+    applyTheme(pack, document.documentElement)
+  }, [pack])
   const scenes = Object.values(room.scenes)
 
   // The GM looks at whichever scene they are editing; players always see the

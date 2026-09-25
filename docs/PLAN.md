@@ -110,7 +110,7 @@ chain. 184 tests, up from 151. `pnpm verify` passes from a clean clone.
 | A ✅ | Node server    | `packages/server` — Fastify, ws, room actors, SQLite, assets, export/restore (D-019)                   | protocol, core       |
 | B ✅ | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `lotr5e` pack (D-016) | pack contract        |
 | C ✅ | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                            | pack contract        |
-| D    | Theming        | `client/theme/**` + three skins                                                                        | theme token contract |
+| D ✅ | Theming        | `client/theme/**` + three skins                                                                        | theme token contract |
 | E ✅ | Docker & ops   | `infra/**` + operations docs                                                                           | nothing              |
 | F ✅ | Test harness   | multi-client e2e against the Node server                                                               | protocol             |
 

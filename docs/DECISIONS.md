@@ -434,3 +434,33 @@ and nothing is parsed out of it. "Scimitar +4 (1d6+2)" could be picked apart
 into a to-hit bonus, and would be wrong often enough to be worse than leaving
 the GM a number they can read on the line in front of them. Losing what they
 wrote would be worse still.
+
+---
+
+## D-026 — A theme value is dropped, not escaped
+
+**Decided.** `resolveTheme` validates every token a pack declares against a
+conservative allowlist and drops anything that fails. `styles.css` keeps
+declaring every property on `:root` as the fallback, so a dropped token means
+the app keeps its default rather than rendering with no colour at all.
+
+Dropping rather than escaping is the point. An escaped value still ships —
+whatever survived the escaping goes into the document, and the question of
+whether that is safe is asked again every time the escaping changes. A dropped
+value ships nothing, and the fallback underneath it is one this repository
+wrote.
+
+The allowlist is per token kind rather than a blacklist of dangerous
+characters, because the set of things a colour or a font stack legitimately
+needs is small and known, and the set of things a browser will do with a CSS
+value is neither. Keys are restricted too: `--x: red; } body {` is as dangerous
+as a key as it is as a value, and guarding only the half you thought of is how
+this goes wrong.
+
+Quotes are allowed where they balance, because a font family with a space in
+its name has to be quoted — the first version of this refused them and rejected
+the app's own font stack, which is the useful kind of test failure.
+
+A pack is data today and GM-supplied packs are a plausible future. None of this
+is load-bearing yet; all of it is cheaper to write now than to retrofit to a
+feature people are already using.

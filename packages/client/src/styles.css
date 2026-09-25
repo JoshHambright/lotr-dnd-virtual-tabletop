@@ -10,8 +10,11 @@
      map art are the only saturated things on screen — which is what a tool
      used for three hours next to a video call actually needs.
 
-     A ruleset pack overrides these, which is how the app reskins itself
-     without a single conditional in a component. */
+     A ruleset pack overrides these by setting the same properties on this
+     element at runtime (see theme.ts), which is how the app reskins itself
+     without a single conditional in a component. What is written here is the
+     fallback, not the truth: a pack that declares no --warn still gets one,
+     and the app before any pack has loaded still has a colour scheme. */
 
   --ground: #0e1116;
   --surface: #151a20;
@@ -42,6 +45,43 @@
   --mono: ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', monospace;
 
   color-scheme: dark;
+}
+
+/* Surface treatments a pack may ask for. Deliberately faint: this window sits
+   next to a video call for three hours and the map has to stay the brightest
+   thing on screen, so a texture is something you notice only once you look for
+   it. Painted on ::before so no element has to know it is there. */
+
+:root[data-texture='parchment'] body::before,
+:root[data-texture='xerox'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Ink on vellum: an uneven warmth, as though the light came from one side. */
+:root[data-texture='parchment'] body::before {
+  background:
+    radial-gradient(120% 90% at 18% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 62%),
+    radial-gradient(110% 80% at 100% 100%, color-mix(in srgb, var(--warn) 4%, transparent), transparent 58%);
+}
+
+/* A bad photocopy: flat, grainy, faintly striped. */
+:root[data-texture='xerox'] body::before {
+  opacity: 0.5;
+  background-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--ink) 4%, transparent) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* Above the texture, so nothing is rendered through it. */
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 * {
