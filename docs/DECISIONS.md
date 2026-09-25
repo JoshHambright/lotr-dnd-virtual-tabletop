@@ -405,3 +405,32 @@ Cloudflare adapter in the socket's attachment so it survives hibernation, and
 the demo loopback on the viewer. A socket hibernating across the deploy that
 added this comes back without a count, is treated as 0, and its client rejoins
 once — which is the right outcome, arrived at by the ordinary path.
+
+---
+
+## D-025 — A stat block is a sheet, in the same language
+
+**Decided.** A pack declares `statBlock: SheetSchema` — the same schema type as
+the character sheet — and it is required, not optional. `StatBlock` in core
+keeps only `id`, `name`, `values`, `color` and `imageAssetId`. Schema 5
+migrates.
+
+Giving a creature its own schema language would have meant a second renderer, a
+second validator and two places to fix every bug, in exchange for expressing
+something the first language already expresses. A stat block _is_ a smaller
+sheet: fields in sections, numbers that roll, rows for attacks.
+
+Required rather than optional because a pack that cannot describe a monster
+cannot run an encounter, and the alternative is a fallback branch living in the
+app forever to serve a pack nobody should ship.
+
+The two namespaces are separate. A creature and a character both having an
+`armourClass` is not a collision, it is two value bags, and the validator
+checks each sheet's keys against its own.
+
+One thing deliberately _not_ carried across by the migration: the old `attacks`
+was a free-text box and is now rows that roll. Each line becomes a row's name
+and nothing is parsed out of it. "Scimitar +4 (1d6+2)" could be picked apart
+into a to-hit bonus, and would be wrong often enough to be worse than leaving
+the GM a number they can read on the line in front of them. Losing what they
+wrote would be worse still.

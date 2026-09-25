@@ -56,7 +56,7 @@ export function CharacterSheet({ client, pack, character, editable }: Props) {
     return () => clearTimeout(timer)
   }, [client, draft])
 
-  const sheet = useMemo(() => deriveSheet(pack, draft.values), [pack, draft.values])
+  const sheet = useMemo(() => deriveSheet(pack.sheet, draft.values), [pack, draft.values])
 
   const setValue = (key: string, value: unknown) => {
     if (!editable) return

@@ -23,6 +23,18 @@ export interface RulesetPack {
   theme: ThemeTokens
   dice: DiceProfile
   sheet: SheetSchema
+  /**
+   * The bestiary card, in the same language as the character sheet.
+   *
+   * Required rather than optional: a pack that cannot describe a monster
+   * cannot run an encounter, and a fallback for packs that omit it would be a
+   * branch in the app forever in exchange for a pack nobody should ship.
+   *
+   * It is deliberately a `SheetSchema` and not a shape of its own. A stat block
+   * is a smaller sheet, and giving it a second schema language would mean a
+   * second renderer, a second validator and two places to fix a bug.
+   */
+  statBlock: SheetSchema
   conditions: Condition[]
   tokenDefaults: TokenDefaults
   content?: ContentIndex
@@ -166,6 +178,12 @@ export interface TokenDefaults {
    * the sheet is the one that kills you.
    */
   hpTrack?: string
+  /**
+   * The same, for a creature deployed from the bestiary. A separate key
+   * because the two sheets are separate schemas and a stat block is as likely
+   * to carry a plain number as a track.
+   */
+  statBlockHp?: string
 }
 
 /** Bundled game content, where a licence allows it to ship. */

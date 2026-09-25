@@ -24,11 +24,11 @@ function frodo(): Record<string, unknown> {
 
 describe('deriveSheet', () => {
   it('computes proficiency from level', () => {
-    expect(deriveSheet(pack, frodo()).derived.proficiency).toBe(3)
+    expect(deriveSheet(pack.sheet, frodo()).derived.proficiency).toBe(3)
   })
 
   it('computes a modifier for every ability the pack declares', () => {
-    const { abilities } = deriveSheet(pack, frodo())
+    const { abilities } = deriveSheet(pack.sheet, frodo())
     expect(abilities.abilities?.map((ability) => [ability.key, ability.modifier])).toEqual([
       ['str', -1],
       ['dex', 3],
@@ -40,7 +40,7 @@ describe('deriveSheet', () => {
   })
 
   it('adds proficiency to a skill once, and expertise twice', () => {
-    const { skills } = deriveSheet(pack, frodo())
+    const { skills } = deriveSheet(pack.sheet, frodo())
     const by = (key: string) => skills.skillProficiency?.find((skill) => skill.key === key)
 
     // dex +3, proficiency 3.
@@ -51,7 +51,7 @@ describe('deriveSheet', () => {
   })
 
   it('treats an empty sheet as zeroes rather than failing', () => {
-    const sheet = deriveSheet(pack, {})
+    const sheet = deriveSheet(pack.sheet, {})
     expect(sheet.problems).toEqual([])
     expect(sheet.derived.proficiency).toBe(2)
     expect(sheet.abilities.abilities?.[0]?.modifier).toBe(-5)
@@ -59,7 +59,7 @@ describe('deriveSheet', () => {
 
   it('clamps a rank the pack does not have, however it got stored', () => {
     const values = { ...frodo(), skillProficiency: { stealth: 99, nature: -4, history: 1.8 } }
-    const { skills } = deriveSheet(pack, values)
+    const { skills } = deriveSheet(pack.sheet, values)
     const by = (key: string) => skills.skillProficiency?.find((skill) => skill.key === key)
 
     expect(by('stealth')?.rank).toBe(2)
@@ -69,7 +69,7 @@ describe('deriveSheet', () => {
 
   it('ignores a value stored with the wrong shape', () => {
     const values = { ...frodo(), abilities: 'sixteen', skillProficiency: [1, 2, 3] }
-    const sheet = deriveSheet(pack, values)
+    const sheet = deriveSheet(pack.sheet, values)
     expect(sheet.abilities.abilities?.every((ability) => ability.score === 0)).toBe(true)
     expect(sheet.problems).toEqual([])
   })
@@ -79,14 +79,14 @@ describe('deriveSheet', () => {
     const identity = broken.sheet.sections[0]?.fields[3]
     if (identity?.kind === 'number') identity.derived = '1 / @level'
 
-    const sheet = deriveSheet(broken, { level: 0 })
+    const sheet = deriveSheet(broken.sheet, { level: 0 })
     expect(sheet.problems).toHaveLength(1)
     expect(sheet.problems[0]).toMatch(/divides by zero/)
     expect(sheet.derived.level).toBe(0)
   })
 
   it('resolves derived fields in declaration order, so a later one can use an earlier', () => {
-    const { derived } = deriveSheet(pack, { level: 17 })
+    const { derived } = deriveSheet(pack.sheet, { level: 17 })
     expect(derived.proficiency).toBe(6)
   })
 })

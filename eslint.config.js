@@ -4,7 +4,11 @@ import tseslint from 'typescript-eslint'
 import reactHooks from 'eslint-plugin-react-hooks'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/dist-demo/**', '**/node_modules/**', '**/.wrangler/**', 'coverage/**'] },
+  // `.claude/worktrees` holds checkouts an agent is working in. Their
+  // half-finished code is not this checkout's to judge.
+  {
+    ignores: ['**/dist/**', '**/dist-demo/**', '**/node_modules/**', '**/.wrangler/**', 'coverage/**', '.claude/**'],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,

@@ -258,7 +258,10 @@ describe('several people at one table', () => {
 
     table.send(gm, { t: 'scene.create', scene: scene('tavern', 'The Prancing Pony') })
     table.send(gm, { t: 'scene.setActive', id: 'tavern' })
-    table.send(gm, { t: 'statblock.upsert', statBlock: { ...newStatBlock('sb-orc', 'Orc'), notes: 'SECRET-WEAKNESS' } })
+    table.send(gm, {
+      t: 'statblock.upsert',
+      statBlock: { ...newStatBlock('sb-orc', 'Orc'), values: { notes: 'SECRET-WEAKNESS' } },
+    })
     table.send(gm, {
       t: 'encounter.upsert',
       encounter: { id: 'e1', name: 'Ambush', notes: 'SECRET-PLAN', members: [{ statBlockId: 'sb-orc', count: 3 }] },

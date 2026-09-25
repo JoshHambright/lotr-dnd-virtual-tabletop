@@ -6,6 +6,7 @@ import {
   identityFor,
   migrateRoom,
   newCharacter,
+  newStatBlock,
 } from '../src/state.js'
 
 describe('migrateRoom', () => {
@@ -62,6 +63,74 @@ describe('migrateRoom', () => {
     expect(migrated.schemaVersion).toBe(ROOM_SCHEMA_VERSION)
     expect(migrated.settings.rulesetId).toBe(DEFAULT_RULESET_ID)
     expect(migrated.characters[character.id]?.ownerId).toBe(identityFor('Bilbo'))
+  })
+
+  it('carries a stat block into the value bag without losing a field', () => {
+    const stored = {
+      ...emptyRoom(),
+      schemaVersion: 4,
+      bestiary: {
+        'sb-orc': {
+          id: 'sb-orc',
+          name: 'Orc of the White Hand',
+          kind: 'Orc',
+          armourClass: 14,
+          maxHp: 15,
+          speed: '30 ft.',
+          abilities: { str: 14, dex: 12 },
+          attributeLevel: 2,
+          might: 1,
+          resolve: 1,
+          hateOrDespair: 2,
+          attacks: 'Scimitar +4 (1d6+2)\nBow +3 (1d8)',
+          specials: 'Sunlight sensitivity',
+          notes: 'Retreats at half',
+          color: '#a33d3d',
+          imageAssetId: null,
+        },
+      },
+    }
+
+    const migrated = migrateRoom(stored)
+    const orc = migrated.bestiary['sb-orc']
+    expect(orc?.name).toBe('Orc of the White Hand')
+    expect(orc?.color).toBe('#a33d3d')
+    expect(orc?.values).toMatchObject({
+      kind: 'Orc',
+      armourClass: 14,
+      hp: { value: 15, max: 15 },
+      speed: '30 ft.',
+      abilities: { str: 14, dex: 12 },
+      attributeLevel: 2,
+      might: 1,
+      resolve: 1,
+      hateOrDespair: 2,
+      specials: 'Sunlight sensitivity',
+      notes: 'Retreats at half',
+    })
+  })
+
+  it('keeps every line of a free-text attack list, without guessing at it', () => {
+    // "Scimitar +4 (1d6+2)" could be parsed into a to-hit bonus, and would be
+    // wrong often enough to be worse than leaving the GM a line they can read.
+    const stored = {
+      ...emptyRoom(),
+      schemaVersion: 4,
+      bestiary: {
+        sb1: { id: 'sb1', name: 'Warg', attacks: 'Bite +5 (2d6+3)\n\n  Pounce  \n', color: '#a33d3d' },
+      },
+    }
+
+    expect(migrateRoom(stored).bestiary.sb1?.values.attacks).toEqual([{ name: 'Bite +5 (2d6+3)' }, { name: 'Pounce' }])
+  })
+
+  it('leaves a stat block already in the new shape alone', () => {
+    const stored = {
+      ...emptyRoom(),
+      schemaVersion: 4,
+      bestiary: { sb1: { ...newStatBlock('sb1', 'Troll'), values: { armourClass: 15 } } },
+    }
+    expect(migrateRoom(stored).bestiary.sb1?.values).toEqual({ armourClass: 15 })
   })
 
   it('does not mutate what it was given', () => {

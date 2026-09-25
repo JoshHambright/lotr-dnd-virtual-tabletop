@@ -279,6 +279,94 @@ export const lotr5e: RulesetPack = {
     ],
   },
 
+  /**
+   * A creature, as the GM reads it off the screen mid-fight.
+   *
+   * Deliberately not a character sheet with the player parts removed. It is a
+   * reference card: the numbers the GM needs in the order they are needed, and
+   * attacks as rows that roll. No derived formulas — a stat block is written
+   * once with the numbers already worked out, and a GM adjusting a creature on
+   * the fly should not have to fight a formula to do it.
+   */
+  statBlock: {
+    sections: [
+      {
+        id: 'creature',
+        title: 'Creature',
+        fields: [
+          { kind: 'text', key: 'kind', label: 'Kind', placeholder: 'Orc, Warg, Troll…' },
+          { kind: 'number', key: 'armourClass', label: 'Armour Class', min: 0 },
+          { kind: 'track', key: 'hp', label: 'Hit points' },
+          { kind: 'text', key: 'speed', label: 'Speed', placeholder: '30 ft.' },
+        ],
+      },
+
+      {
+        id: 'abilities',
+        title: 'Abilities',
+        fields: [
+          {
+            kind: 'abilityBlock',
+            key: 'abilities',
+            abilities: [
+              { key: 'str', label: 'Strength' },
+              { key: 'dex', label: 'Dexterity' },
+              { key: 'con', label: 'Constitution' },
+              { key: 'int', label: 'Intelligence' },
+              { key: 'wis', label: 'Wisdom' },
+              { key: 'cha', label: 'Charisma' },
+            ],
+            modifier: ABILITY_MODIFIER,
+            roll: { label: 'check', expression: '1d20 + @total', visibility: 'gm' },
+          },
+        ],
+      },
+
+      {
+        id: 'adversary',
+        title: 'Adversary',
+        tone: 'grim',
+        fields: [
+          { kind: 'number', key: 'attributeLevel', label: 'Attribute level', min: 0 },
+          { kind: 'number', key: 'might', label: 'Might', min: 0 },
+          { kind: 'number', key: 'resolve', label: 'Resolve', min: 0 },
+          { kind: 'number', key: 'hateOrDespair', label: 'Hate / Despair', min: 0 },
+        ],
+      },
+
+      {
+        id: 'attacks',
+        title: 'Attacks',
+        fields: [
+          {
+            kind: 'repeater',
+            key: 'attacks',
+            label: 'Attacks',
+            // GM-only by default: a creature's to-hit roll landing in the
+            // public log tells the table the armour class before the fight has
+            // told them anything.
+            roll: { label: 'attack', expression: '1d20 + @bonus', visibility: 'gm' },
+            fields: [
+              { kind: 'text', key: 'name', label: 'Attack' },
+              { kind: 'number', key: 'bonus', label: 'To hit' },
+              { kind: 'text', key: 'damage', label: 'Damage' },
+              { kind: 'text', key: 'notes', label: 'Notes' },
+            ],
+          },
+        ],
+      },
+
+      {
+        id: 'notes',
+        title: 'Notes',
+        fields: [
+          { kind: 'longtext', key: 'specials', label: 'Special abilities' },
+          { kind: 'longtext', key: 'notes', label: 'Notes' },
+        ],
+      },
+    ],
+  },
+
   // Names only. The pack ships no rules text, so a condition here is a label to
   // hang on a token, not a description of what it does.
   conditions: [
@@ -303,6 +391,7 @@ export const lotr5e: RulesetPack = {
   tokenDefaults: {
     squares: 1,
     hpTrack: 'hp',
+    statBlockHp: 'hp',
     colors: ['#c8a45c', '#7d9a5e', '#b8543f', '#6f9bd1', '#9a7bb8', '#c07f3f', '#8fa8a0', '#b0b6bd'],
     showHpToPlayers: false,
   },

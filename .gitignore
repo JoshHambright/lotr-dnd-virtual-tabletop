@@ -7,3 +7,4 @@ dist-demo/
 .dev.vars
 *.local
 coverage/
+.claude/worktrees/

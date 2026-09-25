@@ -141,10 +141,8 @@ for the rest of the session. It now counts per connection rather than per room,
 which makes it gapless for its recipient, and the client rejoins when it sees a
 number it did not expect.
 
-What is still LotR-shaped: the **bestiary**. Stat blocks have their own fixed
-interface and still use the old hardcoded constants. Moving them to the pack
-format is its own task, and `packages/rulesets/src/lotr5e-legacy.ts` exists
-until it happens.
+Nothing in the app is LotR-shaped any more. The bestiary followed the character
+sheet onto the pack format (D-025), and `lotr5e-legacy.ts` is gone.
 
 These touch disjoint directories on purpose. The contracts frozen in Phase 0 are
 what let six agents work without stepping on each other.

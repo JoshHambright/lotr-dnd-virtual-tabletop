@@ -12,7 +12,7 @@
 
 import { FormulaError, evaluate } from '@vtt/formula'
 import { DiceError, parseExpression } from '@vtt/dice'
-import type { CharacterValues, Field, RollMacro, RulesetPack, Section } from './pack.js'
+import type { CharacterValues, Field, RollMacro, Section, SheetSchema } from './pack.js'
 
 export interface AbilityView {
   key: string
@@ -50,12 +50,16 @@ export interface DerivedSheet {
 /**
  * Computes everything derived, once.
  *
+ * Takes a `SheetSchema` rather than the whole pack, because a pack declares two
+ * of them — a character's sheet and a creature's stat block — and both compute
+ * the same way.
+ *
  * Order is part of the contract: derived `number` fields resolve first, in the
  * order the pack declares them and each feeding the next, then ability
  * modifiers, then skill modifiers, then track maxima. That is what lets a skill
  * formula say `@proficiency` and mean the field two sections above it.
  */
-export function deriveSheet(pack: RulesetPack, values: CharacterValues): DerivedSheet {
+export function deriveSheet(schema: SheetSchema, values: CharacterValues): DerivedSheet {
   const problems: string[] = []
   const scope: Record<string, unknown> = { ...values }
 
@@ -73,7 +77,7 @@ export function deriveSheet(pack: RulesetPack, values: CharacterValues): Derived
   const skills: Record<string, SkillView[]> = {}
   const trackMax: Record<string, number> = {}
 
-  for (const field of allFields(pack.sheet.sections)) {
+  for (const field of allFields(schema.sections)) {
     if (field.kind === 'number' && field.derived) {
       const value = compute(field.derived, field.label)
       derived[field.key] = value
@@ -82,7 +86,7 @@ export function deriveSheet(pack: RulesetPack, values: CharacterValues): Derived
     }
   }
 
-  for (const field of allFields(pack.sheet.sections)) {
+  for (const field of allFields(schema.sections)) {
     if (field.kind === 'abilityBlock') {
       const scores = readRecord(values[field.key])
       abilities[field.key] = field.abilities.map((ability) => {
@@ -97,7 +101,7 @@ export function deriveSheet(pack: RulesetPack, values: CharacterValues): Derived
     }
   }
 
-  for (const field of allFields(pack.sheet.sections)) {
+  for (const field of allFields(schema.sections)) {
     if (field.kind === 'skillList') {
       const ranks = readRecord(values[field.key])
       skills[field.key] = field.skills.map((skill) => {

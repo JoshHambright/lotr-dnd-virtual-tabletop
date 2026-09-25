@@ -9,7 +9,7 @@
 
 import { z } from 'zod'
 import { FormulaError, parse } from '@vtt/formula'
-import type { Field, RulesetPack } from './pack.js'
+import type { Field, RulesetPack, SheetSchema } from './pack.js'
 
 const identifier = z
   .string()
@@ -104,6 +104,21 @@ const field: z.ZodType = z.lazy(() =>
   ]),
 )
 
+/** Both sheets speak it: a character's and a creature's. */
+const sheetSchema = z.object({
+  sections: z
+    .array(
+      z.object({
+        id: identifier,
+        title: label,
+        tone: z.enum(['default', 'grim', 'highlight']).optional(),
+        fields: z.array(field).max(80),
+      }),
+    )
+    .min(1)
+    .max(24),
+})
+
 export const packSchema = z.object({
   id: identifier,
   name: label,
@@ -154,19 +169,8 @@ export const packSchema = z.object({
       .optional(),
   }),
 
-  sheet: z.object({
-    sections: z
-      .array(
-        z.object({
-          id: identifier,
-          title: label,
-          tone: z.enum(['default', 'grim', 'highlight']).optional(),
-          fields: z.array(field).max(80),
-        }),
-      )
-      .min(1)
-      .max(24),
-  }),
+  sheet: sheetSchema,
+  statBlock: sheetSchema,
 
   conditions: z.array(z.object({ id: identifier, label, description: z.string().max(400).optional() })).max(64),
 
@@ -175,6 +179,7 @@ export const packSchema = z.object({
     colors: z.array(colour).min(1).max(24),
     showHpToPlayers: z.boolean(),
     hpTrack: identifier.optional(),
+    statBlockHp: identifier.optional(),
   }),
 
   content: z
@@ -222,15 +227,56 @@ function crossCheck(pack: RulesetPack): void {
     throw new PackError(`The pack "${pack.id}" ${message}`)
   }
 
+  // The two sheets are separate namespaces: a creature and a character both
+  // having an `armourClass` is not a collision, it is two value bags.
+  const sheet = indexFields(pack.sheet, 'the sheet', fail)
+  const statBlock = indexFields(pack.statBlock, 'the stat block', fail)
+
+  const hpTrack = pack.tokenDefaults.hpTrack
+  if (hpTrack !== undefined && sheet.fields.get(hpTrack)?.kind !== 'track') {
+    fail(`takes token hit points from "${hpTrack}", which is not a track on the sheet`)
+  }
+
+  const statBlockHp = pack.tokenDefaults.statBlockHp
+  if (statBlockHp !== undefined) {
+    const kind = statBlock.fields.get(statBlockHp)?.kind
+    if (kind !== 'track' && kind !== 'number') {
+      fail(`takes a creature's hit points from "${statBlockHp}", which is not a number or track on the stat block`)
+    }
+  }
+
+  // A modifier is a condition on a character, so it is the character's sheet
+  // that has to declare the field it watches.
+  for (const modifier of pack.dice.modifiers ?? []) {
+    if (!sheet.fields.has(modifier.whenField)) {
+      fail(`applies "${modifier.id}" when "${modifier.whenField}" is set, but has no such field`)
+    }
+  }
+}
+
+/**
+ * Walks one sheet, collecting its fields and checking the names it uses point
+ * at something.
+ *
+ * A skill governed by an ability the pack never declares, or a suggestion
+ * drawn from a field that does not exist, is a dead rule — it type-checks,
+ * validates, and then quietly does nothing at the table. Cheaper to fail the
+ * build.
+ */
+function indexFields(
+  schema: SheetSchema,
+  where: string,
+  fail: (message: string) => never,
+): { fields: Map<string, Field>; abilities: Set<string> } {
   const fields = new Map<string, Field>()
   const abilities = new Set<string>()
 
-  for (const section of pack.sheet.sections) {
+  for (const section of schema.sections) {
     for (const field of section.fields) {
       // Keys have to be unique or a sheet silently overwrites its own values.
       // A repeater's rows are their own namespace, so its inner keys are not
       // compared against the sheet's.
-      if (fields.has(field.key)) fail(`uses the field key "${field.key}" twice`)
+      if (fields.has(field.key)) fail(`uses the field key "${field.key}" twice on ${where}`)
       fields.set(field.key, field)
       if (field.kind === 'abilityBlock') for (const ability of field.abilities) abilities.add(ability.key)
     }
@@ -240,36 +286,28 @@ function crossCheck(pack: RulesetPack): void {
     if (field.kind === 'skillList') {
       for (const skill of field.skills) {
         if (!abilities.has(skill.ability)) {
-          fail(`governs the skill "${skill.key}" with "${skill.ability}", which is not an ability it declares`)
+          fail(`governs the skill "${skill.key}" with "${skill.ability}", which is not an ability on ${where}`)
         }
       }
     }
     if (field.kind === 'select' && field.suggest) {
       const from = fields.get(field.suggest.fromKey)
-      if (!from) fail(`suggests "${field.key}" from "${field.suggest.fromKey}", which is not a field`)
+      if (!from) fail(`suggests "${field.key}" from "${field.suggest.fromKey}", which is not a field on ${where}`)
       const options = from?.kind === 'select' ? from.options : undefined
-      const values = new Set(Object.values(field.suggest.map))
-      for (const value of values) {
-        if (!field.options.includes(value))
+      for (const value of new Set(Object.values(field.suggest.map))) {
+        if (!field.options.includes(value)) {
           fail(`suggests "${value}" for "${field.key}", which is not one of its options`)
+        }
       }
       if (options) {
         for (const key of Object.keys(field.suggest.map)) {
-          if (!options.includes(key))
+          if (!options.includes(key)) {
             fail(`keys a suggestion for "${field.key}" on "${key}", which "${from.key}" never offers`)
+          }
         }
       }
     }
   }
 
-  const hpTrack = pack.tokenDefaults.hpTrack
-  if (hpTrack !== undefined && fields.get(hpTrack)?.kind !== 'track') {
-    fail(`takes token hit points from "${hpTrack}", which is not a track`)
-  }
-
-  for (const modifier of pack.dice.modifiers ?? []) {
-    if (!fields.has(modifier.whenField)) {
-      fail(`applies "${modifier.id}" when "${modifier.whenField}" is set, but has no such field`)
-    }
-  }
+  return { fields, abilities }
 }

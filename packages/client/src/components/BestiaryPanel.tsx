@@ -8,15 +8,19 @@
  * GM chooses the moment they appear.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Encounter, Scene, StatBlock } from '@vtt/core'
 import { newStatBlock, newToken } from '@vtt/core'
-import { ABILITIES, ABILITY_NAMES, abilityModifier, formatModifier } from '@vtt/rulesets'
+import type { RollMacro, RulesetPack } from '@vtt/rulesets'
+import { deriveSheet, resolveMacro } from '@vtt/rulesets'
 import type { TableClient } from '../client.js'
 import { newId } from '../ids.js'
+import { SheetSections } from './SheetSections.js'
+import { asNumber, asTrack } from './SheetFields.js'
 
 interface Props {
   client: TableClient
+  pack: RulesetPack
   bestiary: StatBlock[]
   encounters: Encounter[]
   scene: Scene | null
@@ -24,7 +28,7 @@ interface Props {
   onOpen: (id: string | null) => void
 }
 
-export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onOpen }: Props) {
+export function BestiaryPanel({ client, pack, bestiary, encounters, scene, openId, onOpen }: Props) {
   const [tab, setTab] = useState<'creatures' | 'encounters'>('creatures')
   const open = bestiary.find((entry) => entry.id === openId) ?? null
 
@@ -46,8 +50,7 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
         color: statBlock.color,
         statBlockId: statBlock.id,
         imageAssetId: statBlock.imageAssetId,
-        hp: statBlock.maxHp,
-        maxHp: statBlock.maxHp,
+        ...creatureHp(pack, statBlock),
         showHpToPlayers: false,
         hidden: true,
       }),
@@ -108,7 +111,9 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
             ))}
             {bestiary.length === 0 ? <li className="roll-log__empty">Nothing prepared yet.</li> : null}
           </ul>
-          {open ? <StatBlockEditor client={client} statBlock={open} onDeleted={() => onOpen(null)} /> : null}
+          {open ? (
+            <StatBlockEditor client={client} pack={pack} statBlock={open} onDeleted={() => onOpen(null)} />
+          ) : null}
         </>
       ) : (
         <EncountersTab
@@ -125,147 +130,80 @@ export function BestiaryPanel({ client, bestiary, encounters, scene, openId, onO
 
 function StatBlockEditor({
   client,
+  pack,
   statBlock,
   onDeleted,
 }: {
   client: TableClient
+  pack: RulesetPack
   statBlock: StatBlock
   onDeleted: () => void
 }) {
+  // No debounce here, unlike the character sheet. A stat block has one editor
+  // — the GM — so there is no second cursor to fight over, and a monster
+  // written up mid-fight should be on the map the moment it is typed.
   const patch = (value: Partial<StatBlock>) =>
     client.send({ t: 'statblock.upsert', statBlock: { ...statBlock, ...value } })
 
-  const rollAttack = (ability: string) => {
-    const modifier = abilityModifier(statBlock.abilities[ability] ?? 10)
-    client.roll(
-      `1d20${formatModifier(modifier)}`,
-      `${statBlock.name} — ${ABILITY_NAMES[ability as never] ?? ability}`,
-      'normal',
-      'gm',
-    )
+  const derived = useMemo(() => deriveSheet(pack.statBlock, statBlock.values), [pack, statBlock.values])
+
+  const roll = (macro: RollMacro, rowLabel: string, total: number) => {
+    let expression: string
+    try {
+      expression = resolveMacro(macro, { ...statBlock.values, ...derived.derived, total })
+    } catch {
+      // A macro the dice parser refuses is a pack bug, not the GM's problem.
+      return
+    }
+    // Behind the screen unless the pack says otherwise: a creature's to-hit
+    // roll in the public log tells the table its armour class before the fight
+    // has told them anything.
+    client.roll(expression, `${statBlock.name} — ${rowLabel}`, 'normal', macro.visibility ?? 'gm')
   }
 
   return (
     <div className="scene-editor">
       <div className="sheet__grid">
-        <label className="field">
-          <span>Name</span>
-          <input className="input" value={statBlock.name} onChange={(event) => patch({ name: event.target.value })} />
-        </label>
-        <label className="field">
-          <span>Kind</span>
-          <input className="input" value={statBlock.kind} onChange={(event) => patch({ kind: event.target.value })} />
-        </label>
-        <label className="field">
-          <span>Armour class</span>
+        <div className="field">
+          <label htmlFor={`sb-${statBlock.id}-name`}>Name</label>
           <input
+            id={`sb-${statBlock.id}-name`}
             className="input"
-            type="number"
-            value={statBlock.armourClass}
-            onChange={(event) => patch({ armourClass: Number(event.target.value) })}
+            value={statBlock.name}
+            onChange={(event) => patch({ name: event.target.value })}
           />
-        </label>
-        <label className="field">
-          <span>Hit points</span>
-          <input
+        </div>
+        <div className="field">
+          <label htmlFor={`sb-${statBlock.id}-color`}>Token colour</label>
+          <select
+            id={`sb-${statBlock.id}-color`}
             className="input"
-            type="number"
-            value={statBlock.maxHp}
-            onChange={(event) => patch({ maxHp: Number(event.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Speed</span>
-          <input className="input" value={statBlock.speed} onChange={(event) => patch({ speed: event.target.value })} />
-        </label>
-        <label className="field">
-          <span>Attribute level</span>
-          <input
-            className="input"
-            type="number"
-            value={statBlock.attributeLevel}
-            onChange={(event) => patch({ attributeLevel: Number(event.target.value) })}
-          />
-        </label>
+            value={statBlock.color}
+            onChange={(event) => patch({ color: event.target.value })}
+          >
+            {colourOptions(pack, statBlock.color).map((colour) => (
+              <option key={colour} value={colour}>
+                {colour}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="sheet__abilities">
-        {ABILITIES.map((key) => {
-          const score = statBlock.abilities[key] ?? 10
-          return (
-            <div key={key} className="ability">
-              <label htmlFor={`sb-${statBlock.id}-${key}`}>{ABILITY_NAMES[key]}</label>
-              <input
-                id={`sb-${statBlock.id}-${key}`}
-                className="ability__score"
-                type="number"
-                value={score}
-                onChange={(event) =>
-                  patch({ abilities: { ...statBlock.abilities, [key]: Number(event.target.value) } })
-                }
-              />
-              <button type="button" className="ability__mod" onClick={() => rollAttack(key)}>
-                {formatModifier(abilityModifier(score))}
-              </button>
-            </div>
-          )
-        })}
-      </div>
+      <SheetSections
+        sections={pack.statBlock.sections}
+        derived={derived}
+        values={statBlock.values}
+        editable
+        onChange={(key, value) => patch({ values: { ...statBlock.values, [key]: value } })}
+        onRoll={roll}
+      />
 
-      <div className="sheet__grid">
-        <label className="field">
-          <span>Might</span>
-          <input
-            className="input"
-            type="number"
-            value={statBlock.might}
-            onChange={(event) => patch({ might: Number(event.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Resolve</span>
-          <input
-            className="input"
-            type="number"
-            value={statBlock.resolve}
-            onChange={(event) => patch({ resolve: Number(event.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Hate / Despair</span>
-          <input
-            className="input"
-            type="number"
-            value={statBlock.hateOrDespair}
-            onChange={(event) => patch({ hateOrDespair: Number(event.target.value) })}
-          />
-        </label>
-      </div>
-
-      <label className="field field--wide">
-        <span>Attacks</span>
-        <textarea
-          className="input input--area"
-          value={statBlock.attacks}
-          onChange={(event) => patch({ attacks: event.target.value })}
-        />
-      </label>
-      <label className="field field--wide">
-        <span>Special abilities</span>
-        <textarea
-          className="input input--area"
-          value={statBlock.specials}
-          onChange={(event) => patch({ specials: event.target.value })}
-        />
-      </label>
-      <label className="field field--wide">
-        <span>Notes</span>
-        <textarea
-          className="input input--area"
-          value={statBlock.notes}
-          onChange={(event) => patch({ notes: event.target.value })}
-        />
-      </label>
+      {derived.problems.length ? (
+        <p className="hint hint--warn">
+          This stat block has a formula it cannot work out: {derived.problems.join('; ')}.
+        </p>
+      ) : null}
 
       <button
         type="button"
@@ -279,6 +217,12 @@ function StatBlockEditor({
       </button>
     </div>
   )
+}
+
+/** The pack's token palette, plus whatever this creature is already using. */
+function colourOptions(pack: RulesetPack, current: string): string[] {
+  const palette = pack.tokenDefaults.colors
+  return palette.includes(current) ? palette : [current, ...palette]
 }
 
 function EncountersTab({
@@ -418,4 +362,24 @@ function EncountersTab({
       ) : null}
     </>
   )
+}
+
+/**
+ * A creature's hit points, from wherever the pack keeps them.
+ *
+ * A pack that names no field gets a token with no bar rather than a guess
+ * about which number on the card is the one that kills it.
+ */
+function creatureHp(pack: RulesetPack, statBlock: StatBlock): { hp: number | null; maxHp: number | null } {
+  const key = pack.tokenDefaults.statBlockHp
+  if (!key) return { hp: null, maxHp: null }
+
+  const stored = statBlock.values[key]
+  const field = pack.statBlock.sections.flatMap((section) => section.fields).find((entry) => entry.key === key)
+  if (field?.kind === 'track') {
+    const track = asTrack(stored)
+    return { hp: track.max, maxHp: track.max }
+  }
+  const value = asNumber(stored)
+  return { hp: value, maxHp: value }
 }

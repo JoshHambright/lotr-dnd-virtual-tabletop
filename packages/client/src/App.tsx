@@ -457,6 +457,7 @@ export function Table({
             {tab === 'bestiary' && isGm ? (
               <BestiaryPanel
                 client={client}
+                pack={pack}
                 bestiary={Object.values(room.bestiary)}
                 encounters={Object.values(room.encounters)}
                 scene={visibleScene}

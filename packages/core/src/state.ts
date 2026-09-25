@@ -106,22 +106,18 @@ export interface Character {
   portraitAssetId: string | null
 }
 
+/**
+ * A creature the GM can put on the map.
+ *
+ * Same shape of idea as `Character`: the app keeps only what *it* needs — a
+ * name for the token, a colour, a picture — and everything the game defines
+ * lives in `values`, keyed by the pack's `statBlock` schema.
+ */
 export interface StatBlock {
   id: string
   name: string
-  kind: string
-  armourClass: number
-  maxHp: number
-  speed: string
-  abilities: Record<string, number>
-  attributeLevel: number
-  endurance: number
-  might: number
-  resolve: number
-  hateOrDespair: number
-  attacks: string
-  specials: string
-  notes: string
+  /** Everything the ruleset defines. See `CharacterValues`. */
+  values: CharacterValues
   color: string
   imageAssetId: string | null
 }
@@ -201,7 +197,7 @@ export const DEFAULT_RULESET_ID = 'lotr5e'
  * any data worth migrating, because retrofitting a version field onto rooms
  * already on disk means guessing which shape each one is.
  */
-export const ROOM_SCHEMA_VERSION = 4
+export const ROOM_SCHEMA_VERSION = 5
 
 export interface RoomState {
   /** The schema this room was written with. See `migrateRoom`. */
@@ -456,19 +452,9 @@ export function newStatBlock(id: string, name: string): StatBlock {
   return {
     id,
     name,
-    kind: 'Orc',
-    armourClass: 12,
-    maxHp: 11,
-    speed: '30 ft.',
-    abilities: { str: 12, dex: 12, con: 12, int: 8, wis: 9, cha: 7 },
-    attributeLevel: 2,
-    endurance: 11,
-    might: 1,
-    resolve: 1,
-    hateOrDespair: 2,
-    attacks: '',
-    specials: '',
-    notes: '',
+    values: {},
+    // Adversaries default to a warning red so a creature dropped on the map is
+    // never mistaken for somebody's character.
     color: '#a33d3d',
     imageAssetId: null,
   }
@@ -543,6 +529,63 @@ const ROOM_MIGRATIONS: Record<number, (room: RoomState) => RoomState> = {
       Object.entries(room.characters).map(([id, character]) => [id, toValueBag(character)]),
     ),
   }),
+
+  // And then the bestiary followed. A GM's monsters are usually the part of a
+  // campaign with the most work in them, so this carries every field across
+  // rather than asking anyone to retype a stat block.
+  4: (room) => ({
+    ...room,
+    bestiary: Object.fromEntries(
+      Object.entries(room.bestiary).map(([id, statBlock]) => [id, toStatBlockBag(statBlock)]),
+    ),
+  }),
+}
+
+/** The old fixed stat block, in the one place that still needs to know it. */
+function toStatBlockBag(stored: StatBlock): StatBlock {
+  const old = stored as StatBlock & Record<string, unknown>
+  if (old.values && typeof old.values === 'object') return stored
+
+  const take = <T>(key: string, fallback: T): T => (old[key] === undefined ? fallback : (old[key] as T))
+  return {
+    id: stored.id,
+    name: stored.name,
+    values: {
+      kind: take('kind', ''),
+      armourClass: take('armourClass', 10),
+      // Hit points become a track, the same as they did on the character sheet.
+      // A stored stat block has only a maximum, which is also where it starts.
+      hp: { value: take('maxHp', 0), max: take('maxHp', 0) },
+      speed: take('speed', ''),
+      abilities: take('abilities', {}),
+      attributeLevel: take('attributeLevel', 0),
+      might: take('might', 0),
+      resolve: take('resolve', 0),
+      hateOrDespair: take('hateOrDespair', 0),
+      attacks: attacksToRows(take('attacks', '')),
+      specials: take('specials', ''),
+      notes: take('notes', ''),
+    },
+    color: take('color', '#a33d3d'),
+    imageAssetId: take('imageAssetId', null),
+  }
+}
+
+/**
+ * Attacks were one free-text box and are now rows that roll.
+ *
+ * Each line becomes a row's name, and nothing is parsed out of it. Guessing a
+ * to-hit bonus out of "Scimitar +4 (1d8+2)" would be wrong often enough to be
+ * worse than leaving the GM to fill in a number they can see on the line in
+ * front of them — and losing what they wrote would be worse still.
+ */
+function attacksToRows(text: string): Record<string, unknown>[] {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 40)
+    .map((line) => ({ name: line }))
 }
 
 /**

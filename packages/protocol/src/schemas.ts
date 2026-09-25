@@ -81,7 +81,7 @@ const token = z.object({
 })
 
 /**
- * A sheet's values.
+ * A sheet's values — a character's or a creature's.
  *
  * The app cannot know what a pack declares, so this validates *shape and size*
  * rather than meaning: the four shapes a field can store, bounded at every
@@ -106,7 +106,7 @@ const valueRows = z
   .array(z.record(valueKey, scalar).refine((row) => Object.keys(row).length <= 40, 'has too many columns'))
   .max(200)
 
-const characterValues = z
+const sheetValues = z
   .record(valueKey, z.union([scalar, valueMap, valueRows]))
   .refine((values) => Object.keys(values).length <= 400, 'has too many fields')
 
@@ -115,12 +115,18 @@ const character = z.object({
   name: shortText,
   ownerName: shortText,
   ownerId: shortText,
-  values: characterValues,
+  values: sheetValues,
   gmNotes: longText,
   portraitAssetId: id.nullable(),
 })
 
-const statBlock = z.object({ id, name: shortText }).passthrough()
+const statBlock = z.object({
+  id,
+  name: shortText,
+  values: sheetValues,
+  color: colour,
+  imageAssetId: id.nullable(),
+})
 const encounter = z.object({
   id,
   name: shortText,
