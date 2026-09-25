@@ -334,7 +334,7 @@ contract is a feature or a patch.
 
 ---
 
-## D-022 — A roll modifier is named before it is applied
+## D-022 — A roll modifier is named before it is applied _(superseded by D-027)_
 
 **Decided.** The renderer applies a pack's `bonus` modifiers to a roll and only
 _names_ `treat-below-as` and `reroll-at-or-below` on it — "Frodo — Stealth
@@ -464,3 +464,41 @@ the app's own font stack, which is the useful kind of test failure.
 A pack is data today and GM-supplied packs are a plausible future. None of this
 is load-bearing yet; all of it is cheaper to write now than to retrofit to a
 feature people are already using.
+
+---
+
+## D-027 — The dice engine learned the rule, so the pack did not have to change
+
+**Decided.** Supersedes D-022. `treat-below-as` and `reroll-at-or-below` are
+now applied, not merely named. The dice grammar grew `t<n>a<v>` — "treat a
+result at or below n as v" — so `1d20t3a0` is a d20 whose 1, 2 and 3 count as
+0, and `applyRollModifiers` writes a pack's active modifiers into the
+expression before it is sent.
+
+The rule that made this worth doing is Weary, which the table's GM confirmed
+and which fires on every roll while it is on. D-022 was the honest position
+while the rule was a guess; it is the wrong position for a rule people play.
+
+The shape of the fix is the test of the format: the modifier was already
+declared correctly in `packs/lotr5e/pack.ts` and **that file needed no edit at
+all**. D-022's closing line predicted this would become a pack-data change
+rather than a component change, and it turned out to need neither.
+
+The modifier goes into the _expression_, never into a number the client
+computes. Every roll is still resolved server-side, which is what stops anyone
+retconning a result, and a client that could pre-compute a floored total would
+be a client that could pre-compute anything.
+
+Two consequences worth naming:
+
+- **A floored die still shows what it landed on.** `DieRoll.treatedFrom` keeps
+  the face, the log renders `1→0`, and `criticalKind` reads the face rather
+  than the value — a natural 1 is still a fumble when Weary counts it as 0. The
+  die physically landed on a 1; that it counts as nothing is the rule, not the
+  die having shown something else.
+- **Only dice matching `DiceProfile.defaultDie` are floored.** Weary is a rule
+  about the check die and has no opinion about the d6s of a damage roll sharing
+  the expression. The pack format gives a modifier no die scope of its own, so
+  `defaultDie` is the closest thing to an intended one. A pack that needs
+  otherwise needs a field on `RollModifier`, and that is a contract change to
+  argue for rather than to assume.

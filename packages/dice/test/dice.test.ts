@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DiceError, criticalKind, describeResult, parseExpression, roll } from '@vtt/dice'
+import { DiceError, criticalKind, describeResult, faceOf, formatExpression, parseExpression, roll } from '@vtt/dice'
 
 /** A deterministic stand-in for the CSPRNG: replays the given die faces. */
 function sequence(values: number[], sides = 20): () => number {
@@ -42,8 +42,43 @@ describe('parseExpression', () => {
     ['200d6', 'too many dice'],
     ['fireball', 'not dice at all'],
     ['4d6r6', 'a reroll that never ends'],
+    ['1d20t20a0', 'a floor that swallows every face'],
+    ['1d20t0a0', 'a floor that catches nothing'],
+    ['1d20t3', 'a floor with nothing to floor to'],
+    ['1d20a0', 'a value with no threshold'],
   ])('rejects %s (%s)', (input) => {
     expect(() => parseExpression(input)).toThrow(DiceError)
+  })
+
+  it('parses a treat-as floor', () => {
+    const [term] = parseExpression('1d20t3a0')
+    expect(term).toMatchObject({ kind: 'dice', dice: { sides: 20, treatAtOrBelow: { threshold: 3, value: 0 } } })
+  })
+
+  it('takes a floor alongside the other modifiers, in either order', () => {
+    const [term] = parseExpression('2d20kh1t3a0')
+    expect(term).toMatchObject({ dice: { keep: { kind: 'kh', n: 1 }, treatAtOrBelow: { threshold: 3, value: 0 } } })
+    expect(parseExpression('2d20t3a0kh1')[0]).toMatchObject({
+      dice: { keep: { kind: 'kh', n: 1 }, treatAtOrBelow: { threshold: 3, value: 0 } },
+    })
+  })
+})
+
+describe('formatExpression', () => {
+  it('round-trips an expression through the parser', () => {
+    expect(formatExpression(parseExpression('2d20kh1t3a0+5'))).toBe('2d20kh1t3a0+5')
+  })
+
+  it('normalises an omitted count and a percentile die', () => {
+    expect(formatExpression(parseExpression('d20-d%'))).toBe('1d20-1d100')
+  })
+
+  it('writes out a term a caller added a floor to', () => {
+    const terms = parseExpression('1d20+9')
+    const [first] = terms
+    if (first?.kind === 'dice') first.dice.treatAtOrBelow = { threshold: 3, value: 0 }
+    expect(formatExpression(terms)).toBe('1d20t3a0+9')
+    expect(() => parseExpression(formatExpression(terms))).not.toThrow()
   })
 })
 
@@ -101,6 +136,53 @@ describe('roll', () => {
     expect(result.total).toBe(2)
   })
 
+  it('counts a die at or below the threshold as the given value', () => {
+    const result = roll('1d20t3a0+9', 'normal', sequence([2]))
+    const [term] = result.terms
+    if (term?.kind === 'dice') expect(term.rolls[0]).toEqual({ value: 0, kept: true, treatedFrom: 2 })
+    expect(result.total).toBe(9)
+  })
+
+  it('leaves a die above the threshold alone', () => {
+    const result = roll('1d20t3a0', 'normal', sequence([4]))
+    const [term] = result.terms
+    if (term?.kind === 'dice') expect(term.rolls[0]).toEqual({ value: 4, kept: true })
+    expect(result.total).toBe(4)
+  })
+
+  // The whole point of the rule: a 1 that counts as 0 has to be a 0 while the
+  // pool is choosing, or advantage would keep it for a face that no longer is.
+  it('floors a die before keep/drop decides which one counts', () => {
+    const result = roll('2d20kh1t3a0', 'normal', sequence([2, 1]))
+    const [term] = result.terms
+    if (term?.kind === 'dice') {
+      expect(term.rolls.map((r) => [r.treatedFrom, r.value, r.kept])).toEqual([
+        [2, 0, true],
+        [1, 0, false],
+      ])
+    }
+    expect(result.total).toBe(0)
+  })
+
+  it('keeps the die that survives the floor over the one that does not', () => {
+    const result = roll('2d20kh1t3a0', 'normal', sequence([3, 11]))
+    expect(result.total).toBe(11)
+  })
+
+  it('applies the floor to a die advantage produced rather than skipping it', () => {
+    const result = roll('1d20t3a0', 'advantage', sequence([1, 2]))
+    const [term] = result.terms
+    expect(term).toMatchObject({ notation: '2d20kh1t3a0' })
+    expect(result.total).toBe(0)
+  })
+
+  it('rerolls first, then judges the face the die settled on', () => {
+    const result = roll('1d20r1t3a0', 'normal', sequence([1, 2]))
+    const [term] = result.terms
+    if (term?.kind === 'dice') expect(term.rolls[0]).toEqual({ value: 0, kept: true, rerolledFrom: 1, treatedFrom: 2 })
+    expect(result.total).toBe(0)
+  })
+
   it('never rolls outside the faces of the die', () => {
     for (let i = 0; i < 500; i++) {
       const value = roll('1d20').total
@@ -126,5 +208,22 @@ describe('reporting', () => {
 
   it('ignores a twenty that was dropped by disadvantage', () => {
     expect(criticalKind(roll('1d20', 'disadvantage', sequence([20, 5])))).toBeNull()
+  })
+
+  it('writes a floored die as the face it showed and the number it counted for', () => {
+    const result = roll('1d20t3a0+2', 'normal', sequence([1]))
+    expect(describeResult(result)).toBe('1d20t3a0 [1->0] + 2')
+  })
+
+  // Weary changes what the roll totals, not what the die did. The table still
+  // wants to hear that it came up 1.
+  it('still calls a natural one a fumble when it was counted as zero', () => {
+    expect(criticalKind(roll('1d20t3a0', 'normal', sequence([1])))).toBe('failure')
+  })
+
+  it('reads the face a die landed on through the rule that reinterpreted it', () => {
+    const result = roll('1d20t3a0', 'normal', sequence([2]))
+    const [term] = result.terms
+    if (term?.kind === 'dice') expect(term.rolls.map(faceOf)).toEqual([2])
   })
 })

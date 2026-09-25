@@ -1019,6 +1019,13 @@ h3 {
   text-decoration-color: var(--bad);
 }
 
+/* The face a condition took away: struck out, but still legible enough to read
+   across the table when somebody asks what the die actually did. */
+.roll-detail__treated {
+  color: var(--ink-faint);
+  text-decoration-color: var(--bad);
+}
+
 .roll-detail__max {
   color: var(--accent);
   font-weight: 700;
