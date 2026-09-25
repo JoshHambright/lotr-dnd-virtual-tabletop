@@ -50,15 +50,37 @@ describe('the lotr5e pack', () => {
     expect(pack.licence.compatibilityLogo).toBeUndefined()
   })
 
-  it('marks both rules we could not confirm as unverified', () => {
+  it('carries the two rules the GM settled, as data rather than as code', () => {
+    // Weary: a d20 of 1, 2 or 3 counts as 0 before modifiers.
     const weary = pack.dice.modifiers?.find((modifier) => modifier.id === 'weary')
-    expect(weary?.unverified).toBe(true)
+    expect(weary?.effect).toEqual({ kind: 'treat-below-as', threshold: 3, value: 0 })
+    expect(weary?.unverified).toBeUndefined()
 
+    // Shadow path follows the Calling, and is offered rather than imposed.
     const shadowPath = pack.sheet.sections
       .flatMap((section) => section.fields)
       .find((field) => field.key === 'shadowPath')
     expect(shadowPath?.kind).toBe('select')
-    expect(shadowPath?.kind === 'select' && shadowPath.suggest?.unverified).toBe(true)
+    if (shadowPath?.kind !== 'select') throw new Error('shadowPath is no longer a select')
+    expect(shadowPath.suggest?.map).toEqual({
+      Captain: 'Path of Ambition',
+      Champion: 'Path of Wrath',
+      Messenger: 'Path of Madness',
+      Scholar: 'Path of Dark Secrets',
+      'Treasure Hunter': 'Dragon-sickness',
+      Warden: 'Path of Despair',
+    })
+    expect(shadowPath.suggest?.unverified).toBeUndefined()
+    expect(shadowPath.allowCustom).toBe(true)
+  })
+
+  it('offers a path for every Calling it lists, so no Calling is left guessing', () => {
+    const fields = pack.sheet.sections.flatMap((section) => section.fields)
+    const calling = fields.find((field) => field.key === 'calling')
+    const shadowPath = fields.find((field) => field.key === 'shadowPath')
+    if (calling?.kind !== 'select' || shadowPath?.kind !== 'select') throw new Error('the fixture has moved')
+
+    expect(Object.keys(shadowPath.suggest?.map ?? {}).sort()).toEqual([...calling.options].sort())
   })
 
   it('computes a 5e proficiency bonus from its own formula', () => {

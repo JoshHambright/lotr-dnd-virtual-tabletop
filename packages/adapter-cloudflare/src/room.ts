@@ -25,6 +25,20 @@ interface Attachment {
   name: string
   role: Role
   cursor: Presence['cursor']
+  /**
+   * How many operations this socket has been sent.
+   *
+   * Per socket rather than per room, because the two differ: the GM's staging
+   * produces nothing for a player, so a room-wide count arrives at a player
+   * full of legitimate gaps and tells them nothing. Counted per socket it is
+   * gapless, which makes a gap mean one thing — that browser has missed
+   * something — and the client rejoins rather than carrying on with a picture
+   * nobody else shares.
+   *
+   * It rides in the attachment so that it survives hibernation; a counter in
+   * memory would reset on wake and every client would rejoin for no reason.
+   */
+  seq: number
 }
 
 const MAX_ASSET_BYTES = 12 * 1024 * 1024
@@ -37,7 +51,6 @@ export class TableRoom {
   #state: RoomState | null = null
   #gmKey: string | null = null
   #code = ''
-  #seq = 0
   #dirty = false
 
   constructor(
@@ -78,7 +91,6 @@ export class TableRoom {
     this.#state = raw ? (JSON.parse(raw) as RoomState) : null
     this.#gmKey = this.#readMeta('gmKey')
     this.#code = this.#readMeta('code') ?? ''
-    this.#seq = Number(this.#readMeta('seq') ?? '0')
   }
 
   /**
@@ -90,7 +102,6 @@ export class TableRoom {
     if (!this.#state) return
     if (immediate) {
       this.#writeMeta('state', JSON.stringify(this.#state))
-      this.#writeMeta('seq', String(this.#seq))
       this.#dirty = false
       return
     }
@@ -127,7 +138,6 @@ export class TableRoom {
     this.#state = emptyRoom(body.name)
     this.#gmKey = body.gmKey
     this.#code = body.code
-    this.#seq = 0
     this.#writeMeta('gmKey', body.gmKey)
     this.#writeMeta('code', body.code)
     this.#persist(true)
@@ -153,7 +163,7 @@ export class TableRoom {
     const client = pair[0]
     const server = pair[1]
 
-    const attachment: Attachment = { connectionId: crypto.randomUUID(), name, role, cursor: null }
+    const attachment: Attachment = { connectionId: crypto.randomUUID(), name, role, cursor: null, seq: 0 }
     this.ctx.acceptWebSocket(server)
     server.serializeAttachment(attachment)
 
@@ -164,7 +174,7 @@ export class TableRoom {
       role,
       connectionId: attachment.connectionId,
       name,
-      seq: this.#seq,
+      seq: attachment.seq,
       state: projectState(this.#state, role),
       presence: this.#presence(),
     })
@@ -285,7 +295,7 @@ export class TableRoom {
       return
     }
 
-    const attachment = ws.deserializeAttachment() as Attachment | null
+    const attachment = this.#attachmentOf(ws)
     const state = this.#state
     if (!attachment || !state) return
 
@@ -309,7 +319,7 @@ export class TableRoom {
           role: attachment.role,
           connectionId: attachment.connectionId,
           name: attachment.name,
-          seq: this.#seq,
+          seq: attachment.seq,
           state: projectState(state, attachment.role),
           presence: this.#presence(),
         })
@@ -340,6 +350,19 @@ export class TableRoom {
     this.#broadcastPresence()
   }
 
+  /**
+   * Reads a socket's attachment, defaulting a count it does not carry.
+   *
+   * Sockets hibernating across the deploy that added `seq` come back without
+   * one. Treating that as 0 makes those clients see a count they did not
+   * expect and rejoin, which is exactly right — they get a fresh snapshot and
+   * carry on — rather than folding NaN into their arithmetic forever.
+   */
+  #attachmentOf(socket: WebSocket): Attachment | null {
+    const raw = socket.deserializeAttachment() as Attachment | null
+    return raw ? { ...raw, seq: raw.seq ?? 0 } : null
+  }
+
   #handleCursor(ws: WebSocket, attachment: Attachment, message: Extract<ClientMessage, { k: 'cursor' }>): void {
     const next: Attachment = { ...attachment, cursor: message.cursor }
     ws.serializeAttachment(next)
@@ -348,7 +371,7 @@ export class TableRoom {
     const payload: ServerMessage = { k: 'cursor', connectionId: attachment.connectionId, cursor: message.cursor }
     for (const socket of this.ctx.getWebSockets()) {
       if (socket === ws) continue
-      const other = socket.deserializeAttachment() as Attachment | null
+      const other = this.#attachmentOf(socket)
       if (!other) continue
       if (other.role === 'player' && message.cursor && message.cursor.sceneId !== this.#state?.activeSceneId) continue
       this.#send(socket, payload)
@@ -430,10 +453,9 @@ export class TableRoom {
     let next = state
     for (const op of ops) next = reduce(next, op)
     this.#state = next
-    this.#seq += ops.length
 
     for (const socket of this.ctx.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as Attachment | null
+      const attachment = this.#attachmentOf(socket)
       if (!attachment) continue
 
       const projected: Op[] = []
@@ -443,7 +465,10 @@ export class TableRoom {
         projected.push(...projectOp(op, stepBefore, stepAfter, attachment.role))
         stepBefore = stepAfter
       }
-      if (projected.length) this.#send(socket, { k: 'ops', seq: this.#seq, ops: projected })
+      if (!projected.length) continue
+      const next = { ...attachment, seq: attachment.seq + projected.length }
+      socket.serializeAttachment(next)
+      this.#send(socket, { k: 'ops', seq: next.seq, ops: projected })
     }
 
     this.#persist(immediate)
@@ -452,7 +477,7 @@ export class TableRoom {
   #presence(): Presence[] {
     const list: Presence[] = []
     for (const socket of this.ctx.getWebSockets()) {
-      const attachment = socket.deserializeAttachment() as Attachment | null
+      const attachment = this.#attachmentOf(socket)
       if (attachment) {
         list.push({
           connectionId: attachment.connectionId,

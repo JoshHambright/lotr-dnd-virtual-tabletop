@@ -39,7 +39,15 @@ export type ServerMessage =
       state: RoomState
       presence: Presence[]
     }
-  /** A batch of operations to apply in order. `seq` is the server's count after them. */
+  /**
+   * A batch of operations to apply in order.
+   *
+   * `seq` counts the operations *this connection* has been sent, including
+   * these, so it is gapless for its recipient. A client that receives a number
+   * it did not expect has missed a batch and is no longer looking at the same
+   * table as everyone else; the honest response is to throw its copy away and
+   * rejoin, not to carry on and hope.
+   */
   | { k: 'ops'; seq: number; ops: Op[] }
   | { k: 'presence'; presence: Presence[] }
   | { k: 'cursor'; connectionId: string; cursor: Presence['cursor'] }

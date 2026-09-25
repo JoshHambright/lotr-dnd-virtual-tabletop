@@ -27,6 +27,16 @@ interface Seat {
   role: Role
   id: string
   cursor: Presence['cursor']
+  /**
+   * How many operations this seat has been sent.
+   *
+   * Per seat, not per room, because the two numbers differ: the GM's staging
+   * produces nothing for a player, so a room-wide counter arrives at a player
+   * full of legitimate gaps and tells them nothing. Counted per seat it is
+   * gapless by construction, which makes a gap mean exactly one thing — the
+   * browser has missed something and its picture of the table is wrong.
+   */
+  seq: number
 }
 
 const PERSIST_DELAY_MS = 750
@@ -34,7 +44,6 @@ const MAX_FRAME_BYTES = 256 * 1024
 
 export class Room {
   #seats = new Set<Seat>()
-  #seq = 0
   #dirty = false
   #flushTimer: NodeJS.Timeout | null = null
 
@@ -66,6 +75,9 @@ export class Room {
       role,
       id: identityFor(name),
       cursor: null,
+      // A new connection starts its own count at zero; `hello` says so, and
+      // every batch after it follows on.
+      seq: 0,
     }
     this.#seats.add(seat)
 
@@ -185,7 +197,6 @@ export class Room {
     let next = before
     for (const op of ops) next = reduce(next, op)
     this.#state = next
-    this.#seq += ops.length
 
     for (const seat of this.#seats) {
       const projected: Op[] = []
@@ -195,7 +206,9 @@ export class Room {
         projected.push(...projectOp(op, stepBefore, stepAfter, seat.role))
         stepBefore = stepAfter
       }
-      if (projected.length) this.#send(seat, { k: 'ops', seq: this.#seq, ops: projected })
+      if (!projected.length) continue
+      seat.seq += projected.length
+      this.#send(seat, { k: 'ops', seq: seat.seq, ops: projected })
     }
 
     this.#schedulePersist(immediate)
@@ -236,7 +249,7 @@ export class Room {
       role: seat.role,
       connectionId: seat.connectionId,
       name: seat.name,
-      seq: this.#seq,
+      seq: seat.seq,
       state: projectState(this.#state, seat.role),
       presence: this.#presence(),
     }

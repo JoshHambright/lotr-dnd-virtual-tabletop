@@ -48,6 +48,8 @@ export class TableClient {
   #attempt = 0
   #heartbeat: ReturnType<typeof setInterval> | null = null
   #reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  /** Operations this connection has been sent. See the protocol's `seq`. */
+  #seq = 0
   #closedByUs = false
 
   #structuralListeners = new Set<() => void>()
@@ -181,6 +183,20 @@ export class TableClient {
     this.#heartbeat = null
   }
 
+  /**
+   * Drops this connection and joins again, which is the one path that is
+   * already known to produce a correct picture: the server answers a join with
+   * a snapshot of what is true now.
+   */
+  #resync(): void {
+    this.status = 'reconnecting'
+    this.#emit(true)
+    // Closing triggers the transport's close handler, which reconnects with
+    // backoff — so the recovery is the same code the laptop-lid case uses,
+    // rather than a second path that only runs when something has gone wrong.
+    this.#transport?.close()
+  }
+
   #scheduleReconnect(): void {
     const delay = RECONNECT_DELAYS[Math.min(this.#attempt, RECONNECT_DELAYS.length - 1)]!
     this.#attempt++
@@ -196,10 +212,26 @@ export class TableClient {
         this.role = message.role
         this.connectionId = message.connectionId
         this.presence = message.presence
+        this.#seq = message.seq
         this.#emit(true)
         return
 
       case 'ops': {
+        // The count is per connection and gapless. Anything else means a batch
+        // went missing, and this browser is now looking at a table nobody else
+        // is at — a token that is not there, fog that has already lifted. The
+        // only honest move is to throw the copy away and ask for a new one;
+        // applying the rest on top of a wrong picture keeps it wrong for the
+        // rest of the session and looks, to whoever is using it, like the app
+        // simply telling them lies.
+        const expected = this.#seq + message.ops.length
+        if (message.seq !== expected) {
+          console.warn(`Missed an update (expected ${expected}, got ${message.seq}); rejoining the table.`)
+          this.#resync()
+          return
+        }
+        this.#seq = message.seq
+
         let structural = false
         for (const op of message.ops) {
           this.room = reduce(this.room, op)

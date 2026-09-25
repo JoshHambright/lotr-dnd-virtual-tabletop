@@ -376,3 +376,32 @@ them wrong in a way that only shows up at somebody's table.
 `@vtt/core` does not import `@vtt/rulesets`. The room records a pack id as a
 plain string and the reducer never resolves it, so a table can hold a pack this
 build does not ship without the state layer caring.
+
+---
+
+## D-024 — `seq` counts per connection, and the client acts on it
+
+**Decided.** The operation count on an `ops` batch counts what _that
+connection_ has been sent, not what the room has applied. It is therefore
+gapless for its recipient, and a client that sees a number it did not expect
+throws its copy of the table away and rejoins.
+
+The field existed before this and nothing read it. Counted per room it could
+not have been read: the GM's staging produces nothing for a player, so a player
+saw legitimate gaps constantly and had no way to tell those from a batch that
+went missing. A number that cannot be checked is not a safeguard, it is a
+decoration that makes the protocol look safer than it is.
+
+The failure it now catches is the quiet one. A dropped batch does not
+disconnect anybody; it leaves one person looking at a token that is not there
+or fog that has already lifted, for the rest of the session, and the app looks
+to them like it is simply lying. Rejoining is not elegant, but it is the one
+path already known to produce a correct picture — the server answers a join
+with a snapshot of what is true now — and it reuses the reconnect path rather
+than adding a second recovery route that only runs when something is wrong.
+
+All three hosts count per connection: the Node server on the seat, the
+Cloudflare adapter in the socket's attachment so it survives hibernation, and
+the demo loopback on the viewer. A socket hibernating across the deploy that
+added this comes back without a count, is treated as 0, and its client rejoins
+once — which is the right outcome, arrived at by the ordinary path.

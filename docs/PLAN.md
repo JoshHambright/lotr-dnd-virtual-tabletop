@@ -112,7 +112,7 @@ chain. 184 tests, up from 151. `pnpm verify` passes from a clean clone.
 | C ✅ | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                            | pack contract        |
 | D    | Theming        | `client/theme/**` + three skins                                                                        | theme token contract |
 | E ✅ | Docker & ops   | `infra/**` + operations docs                                                                           | nothing              |
-| F    | Test harness   | multi-client e2e against the Node server                                                               | protocol             |
+| F ✅ | Test harness   | multi-client e2e against the Node server                                                               | protocol             |
 
 **B is done.** The formula grammar has a parser and an evaluator that pass every
 frozen conformance vector; `validatePack` rejects a malformed pack at build
@@ -125,6 +125,21 @@ about Middle-earth; `deriveSheet` in `@vtt/rulesets` does the arithmetic, so wha
 a skill modifier comes to is testable without rendering anything. Sheets are a
 value bag (schema 4), and the wire schema bounds it instead of passing arbitrary
 JSON straight into room storage.
+
+**F is done**, in two layers. `packages/core/test/convergence.test.ts` runs a
+table in-process and checks the property that decides whether anyone's screen
+can be trusted: a client that was here the whole time, having applied every
+operation it was sent, holds exactly what a client joining right now would be
+handed. `packages/server/test/concurrency.test.ts` does the same over real
+websockets against a real Fastify server and SQLite store, with clients talking
+over each other. Both were checked by sabotage — break a projection and they go
+red.
+
+That turned up `seq`: the protocol carried an operation count on every batch
+and nothing anywhere read it, so a dropped batch left a browser quietly wrong
+for the rest of the session. It now counts per connection rather than per room,
+which makes it gapless for its recipient, and the client rejoins when it sees a
+number it did not expect.
 
 What is still LotR-shaped: the **bestiary**. Stat blocks have their own fixed
 interface and still use the old hardcoded constants. Moving them to the pack

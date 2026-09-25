@@ -10,9 +10,10 @@
  * Callings — and if the format cannot carry those, that is worth finding out
  * with one pack written rather than three.
  *
- * Two rules in here are guesses, and both carry `unverified: true` so the app
- * says it is unsure instead of quietly deciding a rule at someone's table:
- * which Shadow path each Calling takes, and whether Weary changes a d20 test.
+ * The two rules that shipped as guesses — which Shadow path each Calling takes,
+ * and what Weary does to a d20 test — were settled by the GM this is built for
+ * and no longer carry `unverified`. Both are still data: a table that plays
+ * either differently edits one object here rather than arguing with the app.
  */
 
 import type { RulesetPack } from '../../src/pack.js'
@@ -28,7 +29,14 @@ const HEROIC_CULTURES = [
 
 const CALLINGS = ['Captain', 'Champion', 'Messenger', 'Scholar', 'Treasure Hunter', 'Warden']
 
-const SHADOW_PATHS = ['Curse of Vengeance', 'Dragon-sickness', 'Lure of Power', 'Lure of Secrets']
+const SHADOW_PATHS = [
+  'Dragon-sickness',
+  'Path of Ambition',
+  'Path of Despair',
+  'Path of Dark Secrets',
+  'Path of Madness',
+  'Path of Wrath',
+]
 
 const STANDARDS_OF_LIVING = ['Poor', 'Frugal', 'Martial', 'Prosperous', 'Rich']
 
@@ -96,10 +104,9 @@ export const lotr5e: RulesetPack = {
         id: 'weary',
         label: 'Weary',
         whenField: 'weary',
-        // Unconfirmed against the book. The UI shows this as a rule we are not
-        // sure of; correcting it is a one-line edit here, not a code change.
-        effect: { kind: 'treat-below-as', threshold: 10, value: 0 },
-        unverified: true,
+        // A d20 of 1, 2 or 3 counts as 0 before modifiers — The One Ring's
+        // Feat die rule carried onto the 5e chassis. Confirmed by the GM.
+        effect: { kind: 'treat-below-as', threshold: 3, value: 0 },
       },
     ],
   },
@@ -223,18 +230,17 @@ export const lotr5e: RulesetPack = {
             label: 'Shadow path',
             options: SHADOW_PATHS,
             allowCustom: true,
-            // Unconfirmed. Offered as a suggestion, never filled in silently.
+            // Each Calling takes a fixed path; confirmed by the table's GM.
             suggest: {
               fromKey: 'calling',
               map: {
-                Captain: 'Lure of Power',
-                Champion: 'Lure of Secrets',
-                Messenger: 'Dragon-sickness',
-                Scholar: 'Curse of Vengeance',
+                Captain: 'Path of Ambition',
+                Champion: 'Path of Wrath',
+                Messenger: 'Path of Madness',
+                Scholar: 'Path of Dark Secrets',
                 'Treasure Hunter': 'Dragon-sickness',
-                Warden: 'Curse of Vengeance',
+                Warden: 'Path of Despair',
               },
-              unverified: true,
             },
           },
           { kind: 'toggle', key: 'weary', label: 'Weary' },

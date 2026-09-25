@@ -24,6 +24,15 @@ export class LoopbackTransport implements Transport {
   #handlers: TransportHandlers | null = null
   #role: Role = 'gm'
   #name = 'You'
+  /**
+   * Operations sent to the viewer, not operations applied.
+   *
+   * The protocol's `seq` counts per connection so a client can tell a missing
+   * batch from a batch that was never its business. A staged scene produces
+   * nothing for a player, so counting applications here would hand the client
+   * a gap and it would rejoin, which in the demo means the seat switch would
+   * look broken.
+   */
   #seq = 0
 
   constructor(private room: RoomState) {}
@@ -140,7 +149,6 @@ export class LoopbackTransport implements Transport {
     let next = before
     for (const op of ops) next = reduce(next, op)
     this.room = next
-    this.#seq += ops.length
 
     const projected: Op[] = []
     let stepBefore = before
@@ -149,7 +157,9 @@ export class LoopbackTransport implements Transport {
       projected.push(...projectOp(op, stepBefore, stepAfter, this.#role))
       stepBefore = stepAfter
     }
-    if (projected.length) this.#emit({ k: 'ops', seq: this.#seq, ops: projected })
+    if (!projected.length) return
+    this.#seq += projected.length
+    this.#emit({ k: 'ops', seq: this.#seq, ops: projected })
   }
 
   #hello(): void {

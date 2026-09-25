@@ -109,7 +109,7 @@ describe('validatePack', () => {
 
   it('rejects a suggestion keyed on a value the source field never offers', () => {
     const pack = draft()
-    set(sectionNamed(pack, 'shadow'), 'fields.1.suggest.map.Burglar', 'Lure of Power')
+    set(sectionNamed(pack, 'shadow'), 'fields.1.suggest.map.Burglar', 'Path of Ambition')
     expect(() => validatePack(pack)).toThrow(/"Burglar"/)
   })
 
