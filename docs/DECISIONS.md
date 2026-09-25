@@ -331,3 +331,48 @@ differently edits one object in the pack rather than arguing with the software.
 It also generalises past the thing that prompted it — background to skills in
 SRD 5e is the same shape — which is the test for whether an addition to a frozen
 contract is a feature or a patch.
+
+---
+
+## D-022 — A roll modifier is named before it is applied
+
+**Decided.** The renderer applies a pack's `bonus` modifiers to a roll and only
+_names_ `treat-below-as` and `reroll-at-or-below` on it — "Frodo — Stealth
+(Weary?)" — until the dice engine can express them.
+
+A bonus is arithmetic the existing engine already does. The other two are
+per-die rules `@vtt/dice` has no concept of, and faking them in the client would
+put the numbers somewhere the server cannot check, which is the one thing this
+whole design is arranged to prevent: every roll is resolved server-side so
+nobody can retcon a result.
+
+Naming rather than silently ignoring matters because Weary is also the rule we
+could not verify. The table sees that the app knows the condition is on, and
+that it is not claiming to know what the book does about it. A question mark is
+a cheap, honest interface for exactly that.
+
+When the dice engine grows the two effects, this becomes a pack-data change and
+not a component change, which is the test that the format was right.
+
+---
+
+## D-023 — A character is a value bag, and the app keeps only what it needs
+
+**Decided.** `Character` carries `id`, `name`, `ownerName`, `ownerId`,
+`portraitAssetId`, `gmNotes` and `values`. Everything the game defines lives in
+`values`, keyed by the pack. Schema 4 migrates every existing sheet across.
+
+The five named fields are not a compromise: they are the ones the _app_ uses
+regardless of ruleset. It puts a name on a token, checks an owner, shows a
+portrait, and hides the GM's notes. A pack has no business defining any of
+those, and making them pack fields would mean every pack had to remember to
+declare them or lose the feature.
+
+The migration is written out field by field rather than looping over whatever
+keys are left. Two of them change shape — hit points and Hope become tracks —
+and three are the app's own, so a generic "move everything across" would get
+them wrong in a way that only shows up at somebody's table.
+
+`@vtt/core` does not import `@vtt/rulesets`. The room records a pack id as a
+plain string and the reducer never resolves it, so a table can hold a pack this
+build does not ship without the state layer caring.

@@ -136,3 +136,83 @@ describe('frames off the wire', () => {
     expect(parseValidatedClientMessage(huge)).toBeNull()
   })
 })
+
+/**
+ * A sheet's values are the one place the wire cannot check meaning — the app
+ * does not know what the pack declares. So it checks shape and size instead,
+ * and these are the bounds. What this replaced was a `.passthrough()`: any
+ * client could write unbounded arbitrary JSON into room storage, and every
+ * other browser would be sent it.
+ */
+describe('character values', () => {
+  const sheet = (values: unknown) => ({
+    t: 'character.upsert',
+    character: {
+      id: 'c1',
+      name: 'Frodo',
+      ownerName: 'Josh',
+      ownerId: 'name:josh',
+      values,
+      gmNotes: '',
+      portraitAssetId: null,
+    },
+  })
+
+  const accepts = (values: unknown) => opSchema.safeParse(sheet(values)).success
+
+  it('accepts the four shapes a field stores', () => {
+    expect(
+      accepts({
+        culture: 'Hobbits of the Shire',
+        level: 3,
+        weary: true,
+        shadowPath: null,
+        abilities: { str: 8, dex: 16 },
+        hp: { value: 17, max: 22 },
+        attacks: [{ name: 'Sting', bonus: 5, damage: '1d6+3' }],
+      }),
+    ).toBe(true)
+  })
+
+  it('accepts a key no pack in this build declares', () => {
+    // Dropping it would delete a sheet's data the moment someone opened the
+    // table on a build with an older pack.
+    expect(accepts({ somethingFromAFuturePack: 'kept' })).toBe(true)
+  })
+
+  it('refuses a value nested deeper than a field can store', () => {
+    expect(accepts({ abilities: { str: { base: 8, bonus: 1 } } })).toBe(false)
+    expect(accepts({ attacks: [{ damage: { dice: '1d6' } }] })).toBe(false)
+    expect(accepts({ attacks: [[{ name: 'nested' }]] })).toBe(false)
+  })
+
+  it('refuses a number that is not one', () => {
+    expect(accepts({ level: Number.POSITIVE_INFINITY })).toBe(false)
+    expect(accepts({ abilities: { str: Number.NaN } })).toBe(false)
+  })
+
+  it('caps how many fields one sheet may carry', () => {
+    const many = Object.fromEntries(Array.from({ length: 401 }, (_, index) => [`k${index}`, 1]))
+    expect(accepts(many)).toBe(false)
+    expect(accepts(Object.fromEntries(Array.from({ length: 400 }, (_, index) => [`k${index}`, 1])))).toBe(true)
+  })
+
+  it('caps how many rows a repeater may carry', () => {
+    expect(accepts({ attacks: Array.from({ length: 201 }, () => ({ name: 'x' })) })).toBe(false)
+    expect(accepts({ attacks: Array.from({ length: 200 }, () => ({ name: 'x' })) })).toBe(true)
+  })
+
+  it('caps how long a stored string may be', () => {
+    expect(accepts({ notes: 'x'.repeat(20_001) })).toBe(false)
+    expect(accepts({ abilities: { str: 'x'.repeat(401) } })).toBe(false)
+  })
+
+  it('caps how long a key may be', () => {
+    expect(accepts({ ['k'.repeat(65)]: 1 })).toBe(false)
+  })
+
+  it('still requires the fields the app itself owns', () => {
+    const { ownerId: _omitted, ...missing } = sheet({}).character
+    expect(opSchema.safeParse({ t: 'character.upsert', character: missing }).success).toBe(false)
+  })
+})

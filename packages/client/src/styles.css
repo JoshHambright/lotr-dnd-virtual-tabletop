@@ -762,10 +762,82 @@ h3 {
   padding-top: 10px;
 }
 
-.sheet__section--shadow {
+/* Tone comes from the pack: a Shadow block goes darker, a Hope block lifts.
+   Neither knows it is about Middle-earth. */
+.sheet__section--grim {
   background: linear-gradient(180deg, rgba(60, 40, 70, 0.14), transparent 70%);
   border-radius: var(--radius);
   padding: 10px;
+}
+
+.sheet__section--highlight {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+/* A current/maximum pair: hit points, Hope, Omens. */
+.field--track .track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input--track {
+  min-width: 0;
+  text-align: center;
+}
+
+.track__of {
+  color: var(--ink-faint);
+}
+
+.track__max {
+  font-family: var(--serif);
+  font-size: 1.1em;
+  padding: 0 0.3em;
+}
+
+/* Repeating rows: attacks, gear, powers. */
+.repeater {
+  display: grid;
+  gap: 6px;
+}
+
+.repeater__label {
+  font-size: 0.82em;
+  color: var(--ink-soft);
+}
+
+.repeater__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  align-items: end;
+  gap: 6px;
+  padding: 6px;
+  background: var(--sunken);
+  border-radius: var(--radius);
+}
+
+/* A pack's suggestion. Offered, never applied — see DECISIONS D-021. */
+.hint--action {
+  display: block;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 0.82em;
+  color: var(--accent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hint--action:hover {
+  text-decoration: underline;
+}
+
+.hint--warn {
+  color: var(--warn);
 }
 
 .sheet__abilities {
@@ -816,12 +888,6 @@ h3 {
 .ability__mod:hover {
   background: var(--accent-dim);
   color: var(--accent-ink);
-}
-
-.sheet__conditions {
-  display: flex;
-  gap: 14px;
-  margin-top: 8px;
 }
 
 .skills {

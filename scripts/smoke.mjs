@@ -307,38 +307,25 @@ async function main() {
   check('and a player cannot claim to have rolled as someone else', stealth?.by === 'Josh')
 
   // --- Sheets ----------------------------------------------------------------
+  // A sheet is a value bag the pack defines; the wire checks shape, not meaning.
   const sheet = {
     id: 'c1',
     name: 'Frodo',
+    // Both claims are lies the connection is supposed to overwrite.
     ownerName: 'Gandalf the White',
-    culture: 'Hobbits of the Shire',
-    calling: 'Treasure Hunter',
-    level: 3,
-    abilities: { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 },
-    skillProficiency: { stealth: 1 },
-    saveProficiency: {},
-    maxHp: 22,
-    currentHp: 22,
-    tempHp: 0,
-    armourClass: 13,
-    speed: 25,
-    shadow: 1,
-    shadowPath: 'Dragon-sickness',
-    hope: 3,
-    maxHope: 3,
-    weary: false,
-    miserable: false,
-    standardOfLiving: 'Frugal',
-    patron: '',
-    journeyRole: 'Scout',
-    valour: 1,
-    wisdom: 2,
-    virtues: '',
-    rewards: '',
-    equipment: 'Sting',
-    treasure: '',
-    features: '',
-    notes: '',
+    ownerId: 'name:gandalf the white',
+    values: {
+      culture: 'Hobbits of the Shire',
+      calling: 'Treasure Hunter',
+      level: 3,
+      abilities: { str: 8, dex: 16, con: 12, int: 12, wis: 13, cha: 14 },
+      skillProficiency: { stealth: 1 },
+      hp: { value: 22, max: 22 },
+      hope: { value: 3, max: 3 },
+      shadow: 1,
+      shadowPath: 'Dragon-sickness',
+      equipment: 'Sting',
+    },
     gmNotes: 'SECRET-TEMPT-HIM',
     portraitAssetId: null,
   }
@@ -348,11 +335,27 @@ async function main() {
     .filter((o) => o.t === 'character.upsert')
     .at(-1)?.character
   check('ownership comes from the connection, not the payload', saved?.ownerName === 'Josh')
+  check('and the owner id with it, since that is what permissions read', saved?.ownerId === 'name:josh')
   check('a player cannot write the GM’s private notes', saved?.gmNotes === '')
 
   gm.send({ k: 'op', op: { t: 'character.upsert', character: { ...saved, gmNotes: 'SECRET-TEMPT-HIM' } } })
   await sleep(300)
   check('and never receives them back', !everything(player).includes('SECRET-TEMPT-HIM'))
+
+  const before = allOps(gm).filter((o) => o.t === 'character.upsert').length
+  player.send({
+    k: 'op',
+    op: {
+      t: 'character.upsert',
+      character: { ...sheet, values: { nested: { a: { b: 'DEEP-JUNK' } } } },
+    },
+  })
+  await sleep(300)
+  check(
+    'a sheet nested deeper than a field can store is refused, not saved',
+    allOps(gm).filter((o) => o.t === 'character.upsert').length === before,
+  )
+  check('and nothing from it reached the table', !everything(player).includes('DEEP-JUNK'))
 
   // --- Reconnecting ----------------------------------------------------------
   const returning = await connect(code, 'Josh', null)

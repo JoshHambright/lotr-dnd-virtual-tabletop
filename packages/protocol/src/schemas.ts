@@ -80,19 +80,45 @@ const token = z.object({
   locked: z.boolean(),
 })
 
-const character = z
-  .object({
-    id,
-    name: shortText,
-    ownerName: shortText,
-    abilities: z.record(z.string(), finite),
-    skillProficiency: z.record(z.string(), finite),
-    saveProficiency: z.record(z.string(), z.boolean()),
-  })
-  // The rest of the sheet is about to become pack-defined, so it is carried
-  // through rather than pinned down here. Phase 1 replaces this with
-  // validation against the active pack's sheet schema.
-  .passthrough()
+/**
+ * A sheet's values.
+ *
+ * The app cannot know what a pack declares, so this validates *shape and size*
+ * rather than meaning: the four shapes a field can store, bounded at every
+ * level. That matters more than it sounds — the schema this replaces was a
+ * `.passthrough()`, so any client could write unbounded arbitrary JSON into
+ * room storage and every other browser would be sent it.
+ *
+ * A value the active pack does not recognise still validates. The renderer
+ * ignores keys no field claims, and dropping them here would delete a sheet's
+ * data the moment a table opened on a build with an older pack.
+ */
+const valueKey = z.string().min(1).max(64)
+const scalar = z.union([z.string().max(20_000), finite, z.boolean(), z.null()])
+
+/** abilityBlock scores, skillList ranks, and a track's { value, max }. */
+const valueMap = z
+  .record(valueKey, z.union([finite, z.boolean(), z.string().max(400)]))
+  .refine((record) => Object.keys(record).length <= 200, 'has too many entries')
+
+/** A repeater's rows: attacks, gear, powers. */
+const valueRows = z
+  .array(z.record(valueKey, scalar).refine((row) => Object.keys(row).length <= 40, 'has too many columns'))
+  .max(200)
+
+const characterValues = z
+  .record(valueKey, z.union([scalar, valueMap, valueRows]))
+  .refine((values) => Object.keys(values).length <= 400, 'has too many fields')
+
+const character = z.object({
+  id,
+  name: shortText,
+  ownerName: shortText,
+  ownerId: shortText,
+  values: characterValues,
+  gmNotes: longText,
+  portraitAssetId: id.nullable(),
+})
 
 const statBlock = z.object({ id, name: shortText }).passthrough()
 const encounter = z.object({

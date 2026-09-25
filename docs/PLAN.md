@@ -109,7 +109,7 @@ chain. 184 tests, up from 151. `pnpm verify` passes from a clean clone.
 | ---- | -------------- | ------------------------------------------------------------------------------------------------------ | -------------------- |
 | A ✅ | Node server    | `packages/server` — Fastify, ws, room actors, SQLite, assets, export/restore (D-019)                   | protocol, core       |
 | B ✅ | Ruleset engine | `packages/rulesets` + `packages/formula` — format, loader, validator, evaluator, `lotr5e` pack (D-016) | pack contract        |
-| C    | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                            | pack contract        |
+| C ✅ | Dynamic sheet  | `client/sheet/**` — renders any SheetSchema                                                            | pack contract        |
 | D    | Theming        | `client/theme/**` + three skins                                                                        | theme token contract |
 | E ✅ | Docker & ops   | `infra/**` + operations docs                                                                           | nothing              |
 | F    | Test harness   | multi-client e2e against the Node server                                                               | protocol             |
@@ -120,9 +120,16 @@ time, including cross-references a schema cannot see; `lotr5e` exists as pack
 data and the registry resolves it. A table now records which pack it plays
 (`settings.rulesetId`, schema 3), which is the hook C renders from.
 
-What B deliberately did **not** do: the sheet on screen is still the hardcoded
-LotR component. Making the app render from `pack.sheet` is C, and until C lands
-the pack is correct data that nothing draws.
+**C is done.** `CharacterSheet` renders `pack.sheet.sections` and knows nothing
+about Middle-earth; `deriveSheet` in `@vtt/rulesets` does the arithmetic, so what
+a skill modifier comes to is testable without rendering anything. Sheets are a
+value bag (schema 4), and the wire schema bounds it instead of passing arbitrary
+JSON straight into room storage.
+
+What is still LotR-shaped: the **bestiary**. Stat blocks have their own fixed
+interface and still use the old hardcoded constants. Moving them to the pack
+format is its own task, and `packages/rulesets/src/lotr5e-legacy.ts` exists
+until it happens.
 
 These touch disjoint directories on purpose. The contracts frozen in Phase 0 are
 what let six agents work without stepping on each other.

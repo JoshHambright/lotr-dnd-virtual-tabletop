@@ -293,7 +293,10 @@ describe('what a player may do', () => {
 
   it('lets a player edit their own sheet but not someone else’s', () => {
     const state = table()
-    const edit: Op = { t: 'character.upsert', character: { ...newCharacter('c-frodo', 'Frodo', 'Josh'), values: { hp: { value: 3, max: 22 } } } }
+    const edit: Op = {
+      t: 'character.upsert',
+      character: { ...newCharacter('c-frodo', 'Frodo', 'Josh'), values: { hp: { value: 3, max: 22 } } },
+    }
     expect(authorize(edit, state, josh).ok).toBe(true)
     expect(authorize(edit, state, sam)).toMatchObject({ ok: false })
   })

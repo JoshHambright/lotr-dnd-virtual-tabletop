@@ -175,9 +175,35 @@ type Field =
   | { kind: 'repeater'; key: string; label: string; fields: Field[]; roll?: RollMacro }
 ```
 
-`key` is the path into the character's value bag. Character storage becomes a
-`Record<string, unknown>` validated against the pack's schema, replacing today's
-fixed LotR-shaped interface.
+`key` is the path into the character's value bag. Character storage is a
+`Record<string, unknown>`; the old fixed LotR-shaped interface is gone, and what
+is left on `Character` is only what the _app_ needs — a name to put on a token,
+an owner to check, a portrait, and the GM's private annotations.
+
+### What a field stores
+
+One shape per kind, fixed. The renderer reads defensively — a value of the
+wrong shape renders as empty rather than blanking the sheet — but a pack should
+expect these.
+
+| Kind               | `values[key]`                                      |
+| ------------------ | -------------------------------------------------- |
+| `text`, `longtext` | `string`                                           |
+| `number`           | `number`                                           |
+| `toggle`           | `boolean`                                          |
+| `select`           | `string`                                           |
+| `abilityBlock`     | `Record<abilityKey, number>` — the scores          |
+| `skillList`        | `Record<skillKey, number>` — the proficiency ranks |
+| `track`            | `{ value: number; max: number }`                   |
+| `repeater`         | an array of rows, each keyed by the inner fields   |
+
+A `number` field with a `derived` formula stores nothing: it is the formula's
+answer, and it renders as a value rather than a box.
+
+The wire schema checks these shapes and their sizes, not their meaning — the
+server does not know what pack a client is rendering. It deliberately accepts a
+key no pack in this build declares, because dropping it would delete a sheet's
+data the moment someone opened the table on an older build.
 
 ### Scoped bindings
 
@@ -215,6 +241,15 @@ only honest way to ship a rule we could not check (D-021).
 Both halves are cross-checked at validation: a suggestion keyed on a value the
 source field never offers, or producing a value this field does not list, fails
 the build.
+
+### What a roll modifier does today
+
+A `bonus` modifier is applied — it is arithmetic, and the dice engine needs to
+know nothing about it. `treat-below-as` and `reroll-at-or-below` are **named on
+the roll but not applied**: both need the dice engine to understand floors and
+rerolls, which it does not yet (D-022). A modifier marked `unverified` is named
+with a question mark, so "Frodo — Stealth (Weary?)" reads as the app saying it
+knows the condition is on and is not sure what the book does with it.
 
 ### Roll macros
 
