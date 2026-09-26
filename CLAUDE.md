@@ -75,7 +75,18 @@ pnpm test            # unit tests
 pnpm coverage        # with thresholds; core is gated at 90% lines
 pnpm dev             # the Cloudflare adapter, on :8787
 pnpm demo            # build the standalone demo
+pnpm test:touch      # touch gestures in a real browser; needs `pnpm demo` first
 ```
+
+`pnpm test:touch` is deliberately outside `pnpm verify`: it needs a browser
+binary and the gate should not. It has its own CI job. Set `CHROMIUM_PATH` to
+use a browser already on the machine instead of one Playwright downloads.
+
+**Anything about touch or gesture handling has to be checked by that script, not
+by unit tests alone.** Both of the bugs it has found so far were invisible to
+unit tests by construction: a gesture's previous frame held by reference, so
+every pinch measured as no movement; and the fog brush painting on press, so
+placing two fingers to zoom left a dab of fog behind.
 
 ## Ownership is checked by id, never by name
 

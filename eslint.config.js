@@ -69,6 +69,7 @@ export default tseslint.config(
         URLSearchParams: 'readonly',
         atob: 'readonly',
         setTimeout: 'readonly',
+        URL: 'readonly',
       },
     },
     rules: { 'no-console': 'off', '@typescript-eslint/no-unused-vars': 'off' },

@@ -17,7 +17,8 @@ import { toCells } from '@vtt/core'
 import type { Scene, Token } from '@vtt/core'
 import type { TableClient } from '../client.js'
 import { assetUrl } from '../api.js'
-import { movedEnough, readWheel, zoomFactor } from '../input.js'
+import type { Touch } from '../input.js'
+import { movedEnough, pinchPair, readPinch, readWheel, zoomFactor } from '../input.js'
 import type { Rect } from '../view.js'
 import {
   clampScale,
@@ -64,6 +65,17 @@ interface DragState {
   lastY: number
   /** False until the pointer has travelled far enough to count as a drag. */
   engaged: boolean
+  /**
+   * A fog dab that has been pressed but not yet painted.
+   *
+   * On a mouse the brush paints the instant the button goes down, which is what
+   * it should do. A finger cannot: the second finger of a pinch has not arrived
+   * yet when the first one lands, so painting on press means every attempt to
+   * zoom the map leaves a dab of fog where the hand happened to touch down.
+   * Touch therefore holds the first dab until the gesture has shown what it is
+   * — a move, or a lift with no second finger.
+   */
+  pendingFog?: boolean
 }
 
 /** How quickly the view catches up to where the wheel put it. */
@@ -94,6 +106,32 @@ export function MapView({
   const dragRef = useRef<DragState | null>(null)
   const hoverRef = useRef<string | null>(null)
   const spaceRef = useRef(false)
+
+  /**
+   * Fingers currently on the surface, in the order they arrived.
+   *
+   * Keyed by pointer id, because the browser does not promise the order it
+   * reports them in and a pinch has to keep following the same two.
+   */
+  const touchesRef = useRef<Map<number, Touch>>(new Map())
+  /**
+   * The previous frame of a two-finger gesture, or null if none is running.
+   *
+   * A *copy*, deliberately. `touchesRef` holds live positions that are replaced
+   * as fingers move, so keeping references here would compare each frame
+   * against itself — every pinch would measure as no movement at all, which is
+   * exactly the bug this comment exists to prevent happening again.
+   */
+  const pinchRef = useRef<[Touch, Touch] | null>(null)
+  /**
+   * Set while a pinch is unwinding.
+   *
+   * Lifting one finger from a pinch leaves the other one down, and without this
+   * the active tool would take over mid-gesture — a GM zooming out would finish
+   * by painting a stripe of fog across the map. Cleared only when every finger
+   * has left the glass.
+   */
+  const settlingRef = useRef(false)
   const measureRef = useRef<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null)
   const alignRef = useRef<Rect | null>(null)
   const fogLayerRef = useRef<FogLayer | null>(null)
@@ -370,10 +408,47 @@ export function MapView({
     return screenToMap(viewRef.current, event.clientX - rect.left, event.clientY - rect.top)
   }, [])
 
+  /**
+   * Gives up whatever the single finger was doing, without undoing it.
+   *
+   * Called when a second finger lands. A token that has actually been dragged
+   * is committed where it is — the person did move it, and rewinding would be
+   * its own surprise — but a half-drawn measurement or alignment box is
+   * discarded, because neither is a thing anybody asked to keep.
+   */
+  const abandonTool = useCallback(() => {
+    const drag = dragRef.current
+    dragRef.current = null
+    if (drag?.kind === 'token' && drag.engaged) client.commitMoves()
+    measureRef.current = null
+    alignRef.current = null
+    invalidate()
+  }, [client, invalidate])
+
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (!scene) return
       event.currentTarget.focus()
+
+      if (event.pointerType === 'touch') {
+        touchesRef.current.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY })
+
+        // Two fingers move the map, whatever tool is active — the one gesture
+        // nobody has to be taught, and the reason a single finger can be left
+        // to the tool. See input.ts.
+        const pair = pinchPair([...touchesRef.current.values()])
+        if (pair) {
+          abandonTool()
+          pinchRef.current = frozen(pair)
+          settlingRef.current = true
+          return
+        }
+
+        // A finger arriving while a pinch is still unwinding is part of that
+        // gesture, not the start of a new one.
+        if (settlingRef.current) return
+      }
+
       event.currentTarget.setPointerCapture(event.pointerId)
       const point = pointToMap(event)
 
@@ -419,6 +494,7 @@ export function MapView({
       }
 
       if ((tool === 'reveal' || tool === 'conceal') && client.role === 'gm') {
+        const touching = event.pointerType === 'touch'
         dragRef.current = {
           kind: 'fog',
           pressX: event.clientX,
@@ -426,8 +502,9 @@ export function MapView({
           lastX: point.x,
           lastY: point.y,
           engaged: true,
+          ...(touching ? { pendingFog: true } : {}),
         }
-        paintFog(client, scene, point.x, point.y, brushRadius, tool === 'reveal')
+        if (!touching) paintFog(client, scene, point.x, point.y, brushRadius, tool === 'reveal')
         return invalidate()
       }
 
@@ -453,12 +530,46 @@ export function MapView({
       onSelectToken(null)
       startPan()
     },
-    [brushRadius, client, onSelectToken, pointToMap, scene, tool, invalidate],
+    [abandonTool, brushRadius, client, onSelectToken, pointToMap, scene, tool, invalidate],
   )
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (!scene) return
+
+      if (event.pointerType === 'touch') {
+        if (touchesRef.current.has(event.pointerId)) {
+          touchesRef.current.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY })
+        }
+
+        const previous = pinchRef.current
+        if (previous) {
+          const pair = pinchPair([...touchesRef.current.values()])
+          if (!pair) return
+          pinchRef.current = frozen(pair)
+
+          const gesture = readPinch(previous, pair)
+          const rect = event.currentTarget.getBoundingClientRect()
+
+          // Pan first, then zoom about the fingers, so the point between them
+          // stays under them rather than sliding as the map scales.
+          const panned = {
+            ...targetRef.current,
+            x: targetRef.current.x + gesture.dx / targetRef.current.scale,
+            y: targetRef.current.y + gesture.dy / targetRef.current.scale,
+          }
+          const zoomed = zoomAt(panned, gesture.centreX - rect.left, gesture.centreY - rect.top, gesture.scale)
+
+          // Both refs, so a pinch tracks the fingers exactly instead of easing
+          // along behind them.
+          targetRef.current = zoomed
+          viewRef.current = zoomed
+          return invalidate()
+        }
+
+        if (settlingRef.current) return
+      }
+
       const point = pointToMap(event)
       const drag = dragRef.current
 
@@ -510,6 +621,12 @@ export function MapView({
         }
 
         case 'fog': {
+          // The gesture has committed to being a stroke, so the dab held back
+          // on press goes down now, ahead of the segment it starts.
+          if (drag.pendingFog) {
+            drag.pendingFog = false
+            paintFog(client, scene, drag.lastX, drag.lastY, brushRadius, tool === 'reveal')
+          }
           // Stamp along the segment so a fast drag does not leave gaps.
           stampAlong(client, scene, drag.lastX, drag.lastY, point.x, point.y, brushRadius, tool === 'reveal')
           drag.lastX = point.x
@@ -534,8 +651,29 @@ export function MapView({
 
   const onPointerUp = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
+      if (event.pointerType === 'touch') {
+        touchesRef.current.delete(event.pointerId)
+
+        const remaining = [...touchesRef.current.values()]
+        const pair = pinchPair(remaining)
+        pinchRef.current = pair ? frozen(pair) : null
+
+        // The pinch is over, but the tool does not resume until the hand is
+        // off the glass — otherwise the finger still resting there starts
+        // painting the moment the other one lifts.
+        if (remaining.length === 0) settlingRef.current = false
+        if (pinchRef.current || settlingRef.current) return invalidate()
+      }
+
       const drag = dragRef.current
       dragRef.current = null
+
+      // A tap with the brush, rather than a stroke: no second finger came and
+      // the hand never moved, so the dab was meant after all.
+      if (drag?.kind === 'fog' && drag.pendingFog && scene) {
+        paintFog(client, scene, drag.lastX, drag.lastY, brushRadius, tool === 'reveal')
+      }
+
       if (drag?.kind === 'token' && drag.engaged) client.commitMoves()
       if (drag?.kind === 'measure') measureRef.current = null
       if (drag?.kind === 'align') {
@@ -546,7 +684,7 @@ export function MapView({
       applyCursor(event.currentTarget, tool, null, hoverRef.current, spaceRef.current)
       invalidate()
     },
-    [client, tool, invalidate, onAlignBox],
+    [brushRadius, client, scene, tool, invalidate, onAlignBox],
   )
 
   return (
@@ -555,12 +693,22 @@ export function MapView({
         ref={canvasRef}
         className="map-canvas"
         tabIndex={0}
-        aria-label="The map. Drag to pan, scroll to zoom, arrow keys move the selected token."
+        aria-label="The map. Drag to pan, scroll or pinch to zoom, two fingers to move it, arrow keys move the selected token."
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => {
+        onPointerLeave={(event) => {
+          // A finger leaving without an up would otherwise leave the map
+          // convinced a gesture is still running, and the tool dead for the
+          // rest of the session.
+          if (event.pointerType === 'touch') {
+            touchesRef.current.delete(event.pointerId)
+            if (touchesRef.current.size === 0) {
+              pinchRef.current = null
+              settlingRef.current = false
+            }
+          }
           client.setCursor(null)
           if (hoverRef.current) {
             hoverRef.current = null
@@ -580,6 +728,11 @@ export function MapView({
       </div>
     </div>
   )
+}
+
+/** A snapshot of two fingers, safe to compare a later frame against. */
+function frozen(pair: [Touch, Touch]): [Touch, Touch] {
+  return [{ ...pair[0] }, { ...pair[1] }]
 }
 
 /**

@@ -502,3 +502,77 @@ Two consequences worth naming:
   `defaultDie` is the closest thing to an intended one. A pack that needs
   otherwise needs a field on `RollModifier`, and that is a contract change to
   argue for rather than to assume.
+
+---
+
+## D-028 — Two fingers move the map, one finger works the tool
+
+**Decided.** On a touchscreen, two fingers always pan and zoom, whatever tool is
+selected. A single finger does whatever the active tool does. A second finger
+landing abandons the single-finger gesture rather than continuing it.
+
+The map has tools — paint fog, measure, drag an alignment box — and on a desktop
+those live on the left button while panning lives on the middle button, the
+right button and space-drag. A finger has no buttons. Reserving two fingers for
+moving the map is the only arrangement that leaves the single finger free, and
+it is the one gesture nobody has to be taught.
+
+"Abandons rather than continues" is the part that took the work. A token that
+has really been dragged is committed where it is, because the person did move
+it and rewinding is its own surprise; a half-drawn measurement or alignment box
+is discarded, because neither is a thing anybody asked to keep. And the tool
+does not resume when one finger lifts from a pinch — the hand has to leave the
+glass — or the finger still resting there starts painting the moment the other
+one goes.
+
+**The fog brush had to stop painting on press.** On a mouse, pressing the button
+paints a dab immediately, which is right. On a finger it cannot: the second
+finger of a pinch has not arrived yet when the first one lands, so painting on
+press means every attempt to zoom leaves a dab of fog where the hand touched
+down. Touch now holds the first dab until the gesture has shown what it is — a
+move, or a lift with no second finger. A mouse still paints on press.
+
+---
+
+## D-029 — Layout asks about the window, target size asks about the hand
+
+**Decided.** Width and orientation media queries decide _layout_. A
+`(pointer: coarse)` query decides _target size_. They are never mixed.
+
+They are different questions and a width breakpoint answers both wrongly: a
+tablet with a keyboard attached is still driven by a finger, and a narrow
+desktop window is still driven by a mouse. Growing every control to 44px at a
+width breakpoint would also cost the density that makes this quick to use with
+a mouse, which is still the primary way it is used.
+
+Both halves were then **measured in a real browser rather than reasoned about**,
+and both were wrong on the first attempt. The portrait split gave the map 55vh
+because a map you cannot read is not worth the space the panel saved — which
+left the panel 245px tall on an 820x1180 tablet, not enough for a character
+sheet under a tab bar. It is 45vh now. And three controls were still
+finger-hostile after the `pointer: coarse` rules went in: the checkbox inside a
+grown label, the map's own overlay buttons, and the dice-colour swatches, none
+of which are a `.button`. Reading the stylesheet would not have found any of
+them.
+
+---
+
+## D-030 — Full screen is the browser's, not a mode of our own
+
+**Decided.** The full-screen button calls the Fullscreen API and nothing else.
+There is no "map only" mode that hides the app's own chrome.
+
+Asked which was wanted, the answer was the browser's. It is also the honest
+division: the app's furniture is one bar and one panel, both of which the person
+chose to have on screen, while the browser's tab strip and address bar are not
+part of the game at all and on a projector or a television they are the only
+thing on screen that is not.
+
+Everything about the API is written to be absent rather than polyfilled —
+Safari on an iPhone has no element fullscreen, an iPad only gained it in 16.4,
+and an iframe without the right permissions policy has the method and refuses
+every call. The button hides itself when `document.fullscreenEnabled` is false,
+and a refusal is swallowed: the honest outcome is that the button did not work,
+which the returned state already says. Escape and F11 leave full screen without
+going near the button, so the label follows `fullscreenchange` rather than a
+boolean of our own.

@@ -93,6 +93,23 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* The app fills the window and manages its own scrolling. Without this a
+     tablet rubber-bands the whole page when a panel reaches its end, which
+     drags the map out from under whoever was looking at it. */
+  overscroll-behavior: none;
+}
+
+/* Dragging on the map must not start selecting the interface around it. The
+   canvas already sets `touch-action: none`; this is the rest of the furniture,
+   which has nothing worth selecting anyway. */
+.table__bar,
+.table__tools,
+.table__people,
+.map-hud,
+.tabs,
+.chips {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 body {
@@ -990,12 +1007,26 @@ h3 {
   background: var(--raised);
 }
 
-/* --- Narrow screens ------------------------------------------------------ */
+/* --- Other shapes of screen ---------------------------------------------- */
 
-@media (max-width: 900px) {
+/* Two independent questions, asked separately on purpose.
+
+   *Layout* is a question about the window: how much room is there, and is it
+   taller than it is wide. *Target size* is a question about the input device:
+   is a finger driving this. They are not the same question, and answering both
+   with a width breakpoint gets both wrong — a tablet with a keyboard attached
+   is still touch, and a narrow desktop window is still a mouse. */
+
+/* Portrait: map above, panel below.
+
+   The split is 45vh rather than the 55vh I first wrote. Measuring an 820x1180
+   tablet showed 55vh leaving the panel 245px tall, which is not enough for a
+   character sheet under a tab bar — and a sheet nobody can fill in is a worse
+   trade than a slightly smaller map. */
+@media (max-width: 900px), (orientation: portrait) and (max-width: 1100px) {
   .table__body {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 45vh) 1fr;
+    grid-template-rows: minmax(280px, 45vh) 1fr;
   }
 
   .table__side {
@@ -1005,6 +1036,144 @@ h3 {
 
   .dice-tray {
     width: 180px;
+  }
+}
+
+/* Landscape on a tablet: the side-by-side split is right, but 360px of panel
+   is too narrow to put a finger in. */
+@media (orientation: landscape) and (max-width: 1400px) and (pointer: coarse) {
+  .table__body {
+    grid-template-columns: 1fr minmax(380px, 34vw);
+  }
+}
+
+/* A finger is driving. Everything interactive grows to a comfortable target —
+   44px is the usual floor — and only here, because doing it on the desktop
+   would cost the density that makes the tool quick to use with a mouse. */
+@media (pointer: coarse) {
+  .button,
+  .chip,
+  .input,
+  select.input {
+    min-height: 44px;
+  }
+
+  .button--small,
+  .chip {
+    padding: 0.5em 0.9em;
+    font-size: 0.9em;
+  }
+
+  .code {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* The roll buttons on a sheet: small text, but the whole control is the
+     target, so it grows rather than the type. */
+  .ability__mod,
+  .skill__mod,
+  .skill__rank {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .ability__score,
+  .input--track {
+    min-height: 44px;
+  }
+
+  .skill {
+    padding: 2px 0;
+  }
+
+  /* The label grows, but the box inside it is what a finger actually aims at,
+     and a 13px checkbox is a 13px target however tall its label is. */
+  .checkbox {
+    min-height: 44px;
+  }
+
+  .checkbox input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* The map's own overlay controls and the dice-colour swatches: neither is a
+     `.button`, so neither was caught by the rule above. Found by measuring the
+     rendered page rather than by reading the stylesheet, which is the only way
+     this kind of omission gets found. */
+  .map-hud__button {
+    min-height: 44px;
+    padding: 0.15em 0.9em;
+  }
+
+  .die-swatch {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  /* A finger cannot hit a 10px dot, and it does not need to — it is a colour
+     swatch, not a control. */
+  .dot {
+    width: 14px;
+    height: 14px;
+  }
+
+  .repeater__row {
+    gap: 10px;
+  }
+
+  /* No double-tap-to-zoom on a control, and no grey flash when it is tapped.
+     Both read as the browser interrupting the app. */
+  .button,
+  .chip,
+  .skill__rank,
+  .skill__mod,
+  .ability__mod,
+  .map-hud__button,
+  .code {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* The header bar holds the table name, the code, a status, up to six tool
+   chips, a preview checkbox, everyone present and two buttons. On a tablet in
+   portrait that does not fit on one row, so it wraps — and the tools are given
+   the whole width of their own row, because the GM changes tool constantly and
+   a chip that has scrolled out of reach mid-fight is the one thing here that
+   must not happen. */
+@media (max-width: 1100px) {
+  .table__bar {
+    justify-content: flex-start;
+  }
+
+  .table__tools {
+    order: 3;
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .table__people {
+    margin-left: auto;
+  }
+}
+
+/* Room for the home bar and the notch. `viewport-fit=cover` is set in
+   index.html, so without this a tablet puts the Leave button under the bar. */
+@supports (padding: max(0px)) {
+  .table__bar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .table__side {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

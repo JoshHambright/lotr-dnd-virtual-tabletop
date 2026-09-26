@@ -25,6 +25,7 @@ import { getImage, solveGrid } from './view.js'
 import { assetUrl, roomExists } from './api.js'
 import { packFor } from './pack.js'
 import { applyTheme } from './theme.js'
+import { isFullscreen, isSupported as fullscreenSupported, toggleFullscreen, watchFullscreen } from './fullscreen.js'
 import { detectGridInImage } from './gridDetect.js'
 import type { DetectedGrid } from './gridDetect.js'
 import { newToken } from '@vtt/core'
@@ -126,6 +127,11 @@ export function Table({
   const isGm = client.role === 'gm'
   const room = client.room
   const { pack, missing: missingPack } = packFor(room.settings.rulesetId)
+
+  // Tracked rather than asked for on render, because Escape and F11 leave full
+  // screen without going near the button, and a stale label is worse than none.
+  const [fullscreen, setFullscreen] = useState(isFullscreen)
+  useEffect(() => watchFullscreen(setFullscreen), [])
 
   // The pack wears the app, rather than the app knowing what the pack is. See
   // theme.ts — the tokens cascade, so no component has a conditional in it.
@@ -297,6 +303,21 @@ export function Table({
               {person.name}
             </span>
           ))}
+          {fullscreenSupported() ? (
+            <button
+              type="button"
+              className="button button--small"
+              aria-pressed={fullscreen}
+              title={
+                fullscreen
+                  ? 'Give the browser its bars back'
+                  : 'Hide the browser’s own bars so the map gets the whole screen'
+              }
+              onClick={() => void toggleFullscreen()}
+            >
+              {fullscreen ? 'Exit full screen' : 'Full screen'}
+            </button>
+          ) : null}
           <button type="button" className="button button--small" onClick={onLeave}>
             Leave
           </button>
