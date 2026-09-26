@@ -26,9 +26,13 @@ pnpm build && pnpm --filter @vtt/adapter-cloudflare exec wrangler dev --port 878
 node scripts/smoke.mjs
 ```
 
-Those 43 checks plant marked secrets and assert none reach a real player
+Those 57 checks plant marked secrets and assert none reach a real player
 socket. They are a security test, not a nicety. Never skip them, never make
 them advisory, never delete a case to get green.
+
+They run against **both hosts unchanged** — the Node server and the Cloudflare
+adapter. That is the point of them: one core, one set of rules, and two very
+different pieces of plumbing that have to give the same answers.
 
 ## Frozen contracts
 
@@ -78,6 +82,13 @@ pnpm demo            # build the standalone demo
 pnpm test:touch      # touch gestures in a real browser; needs `pnpm demo` first
 ```
 
+Rate limits live in `packages/core/src/limits.ts` and both hosts enforce them.
+Two buckets, because the traffic is genuinely two kinds: a cursor or a token
+drag is frequent, cheap and thrown away, while a roll, a chat line or a scene
+change costs a write and goes in front of everyone. **If you add a message
+kind, give it a cost in `costOf`** — anything unrecognised is treated as
+expensive, which is the safe default but will throttle something it should not.
+
 `pnpm test:touch` is deliberately outside `pnpm verify`: it needs a browser
 binary and the gate should not. It has its own CI job. Set `CHROMIUM_PATH` to
 use a browser already on the machine instead of one Playwright downloads.
@@ -90,14 +101,23 @@ placing two fingers to zoom left a dab of fog behind.
 
 ## Ownership is checked by id, never by name
 
-`identityFor(name)` in `packages/core/src/state.ts` is the one place a person
-becomes an identity, and every ownership check reads `ownerId`. Today the id is
-derived from the display name, so it carries no more authority than the name
-does — that is known and accepted (D-017).
+Every ownership check reads `ownerId`. An id comes from one of two places, both
+in `packages/core/src/state.ts`:
 
-Do not add a check that compares `ownerName`. The whole point of the
-indirection is that issuing real per-player tokens later changes `identityFor`
-and the join handshake, and nothing else.
+- `identityForInvite(playerId)` — a player who followed a link the GM issued.
+  This is the real one.
+- `identityFor(name)` — a player who typed a name on an open table. Worth
+  exactly what a typed name is worth, which is why a table can be set to refuse
+  it (`settings.requireInvite`, D-031).
+
+The two prefixes are deliberately different so one can never satisfy a check
+meant for the other. **Do not add a check that compares `ownerName`**, and do
+not re-derive an id from a name after the connection is made — that would
+quietly undo an invite. The id settles once, at join.
+
+Signing is each host's own business: the Node server derives invites from
+`TABLE_SECRET`, the Worker stores the ones it issued. The _link format_ is
+shared, in core, so a player cannot tell which host they are talking to.
 
 ## Two things that look like footguns but are deliberate
 

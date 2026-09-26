@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { WebSocket } from 'ws'
 import type { Op, Role, RoomState } from '@vtt/core'
-import { newScene, newToken, projectState, reduce } from '@vtt/core'
+import { MAX_SEATS, newScene, newToken, projectState, reduce } from '@vtt/core'
 import type { ServerHandle } from '../src/server.js'
 import { createServer } from '../src/server.js'
 
@@ -323,6 +323,85 @@ describe('a table over real sockets', () => {
     gm.close()
     sam.close()
   }, 30_000)
+
+  it('holds up under the whole group dragging at once', async () => {
+    // Phase 3 asks for six clients and sustained dragging. Six is the group
+    // plus the GM; the numbers below are the ones a real session produces —
+    // the client throttles a drag to roughly 25 moves a second.
+    const { code, gmKey } = await openTable('Everyone at once')
+    const gm = await Client.join(code, 'Josh', gmKey)
+    const players = await Promise.all(
+      ['Sam', 'Merry', 'Pippin', 'Gimli', 'Legolas'].map((name) => Client.join(code, name)),
+    )
+
+    gm.send({ t: 'scene.create', scene: scene('road', 'The Road') })
+    gm.send({ t: 'scene.setActive', id: 'road' })
+    gm.send({ t: 'fog.enable', sceneId: 'road', enabled: true })
+    for (const player of players) {
+      gm.send({ t: 'token.create', token: newToken(`t-${player.name}`, 'road', 0, 0, { label: player.name }) })
+    }
+    await fence(gm, [gm, ...players])
+
+    const started = Date.now()
+    const ROUNDS = 40
+
+    for (let round = 0; round < ROUNDS; round += 1) {
+      for (const [index, player] of players.entries()) {
+        player.send({ t: 'token.move', id: `t-${player.name}`, x: round * 12 + index * 5, y: round * 8 })
+      }
+      // The GM paints fog over the top, as they would while the party moves.
+      if (round % 4 === 0) {
+        gm.send({
+          t: 'fog.paint',
+          sceneId: 'road',
+          shape: { kind: 'circle', x: round * 12, y: round * 8, radius: 70 },
+          reveal: true,
+        })
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+
+    await fence(gm, [gm, ...players])
+    const elapsed = Date.now() - started
+
+    // 200 moves plus fog, delivered to six sockets. The assertion is loose on
+    // purpose: this is a smoke test for "does it fall over", not a benchmark,
+    // and a tight bound would fail on a loaded CI runner for no reason.
+    expect(elapsed).toBeLessThan(20_000)
+
+    const truth = await serverState(code, gmKey)
+    expectAgrees(gm, truth, 'gm', 'the GM')
+    for (const player of players) expectAgrees(player, truth, 'player', player.name)
+
+    // Every token ended where its owner last put it, and nothing was dropped.
+    for (const [index, player] of players.entries()) {
+      expect(truth.tokens[`t-${player.name}`]).toMatchObject({
+        x: (ROUNDS - 1) * 12 + index * 5,
+        y: (ROUNDS - 1) * 8,
+      })
+    }
+
+    for (const client of [gm, ...players]) client.close()
+  }, 60_000)
+
+  it('turns away a connection once the table is full', async () => {
+    // A link posted somewhere public should cost a refusal, not a thousand
+    // open sockets. MAX_SEATS is far above any real group.
+    const { code, gmKey } = await openTable('Full')
+    const seated = [await Client.join(code, 'Josh', gmKey)]
+    for (let i = 1; i < MAX_SEATS; i += 1) seated.push(await Client.join(code, `Player ${i}`))
+
+    await expect(Client.join(code, 'One too many')).rejects.toThrow()
+
+    // And a seat freed by someone leaving is a seat somebody else can take.
+    seated.pop()?.close()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const latecomer = await Client.join(code, 'After a leaver')
+    expect(latecomer.view).toBeTruthy()
+
+    latecomer.close()
+    for (const client of seated) client.close()
+  }, 60_000)
 
   it('refuses a player’s forbidden operation without knocking anyone out of step', async () => {
     const { code, gmKey } = await openTable('The Prancing Pony')

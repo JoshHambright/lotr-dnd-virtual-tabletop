@@ -403,6 +403,42 @@ async function main() {
     everything(sameName).includes('belongs to someone else') && !everything(gm).includes('SECRET-STOLEN'),
   )
 
+  // --- Rate limits -----------------------------------------------------------
+  // This is about to live behind a public tunnel. None of this stops a
+  // determined attacker; it stops a stuck client or a bored stranger from
+  // taking a session down, which is the failure that would actually happen.
+  const flooder = await connect(code, 'Flood', null)
+  await sleep(200)
+  const beforeFlood = allOps(gm).length
+  for (let i = 0; i < 400; i++) {
+    flooder.send({ k: 'chat', text: `flood ${i}`, visibility: 'public' })
+  }
+  await sleep(800)
+  const accepted = allOps(gm).length - beforeFlood
+  check(`a chat flood is throttled (${accepted} of 400 got through)`, accepted > 0 && accepted < 120)
+  check('and the flooder is told once, not four hundred times', everything(flooder).split('Slow down').length - 1 <= 3)
+
+  // The table still works for everyone else while one client is misbehaving.
+  gm.send({ k: 'chat', text: 'STILL-HERE', visibility: 'public' })
+  await sleep(400)
+  check('the table still answers everyone else', everything(gm).includes('STILL-HERE'))
+
+  // A real drag is not a flood: the client throttles moves to about 25 a
+  // second, and that must pass without a word. Its own token, so that dragging
+  // it does not disturb what a later check expects to find where it left it.
+  gm.send({ k: 'op', op: { t: 'token.create', token: token('drag-test', live.id, { label: 'Barrel' }) } })
+  await sleep(200)
+
+  const dragger = await connect(code, 'Dragger', null)
+  await sleep(200)
+  const beforeDrag = everything(dragger).length
+  for (let i = 0; i < 40; i++) {
+    dragger.send({ k: 'op', op: { t: 'token.move', id: 'drag-test', x: 100 + i, y: 100 } })
+    await sleep(20)
+  }
+  await sleep(300)
+  check('a real token drag is never throttled', !everything(dragger).slice(beforeDrag).includes('Slow down'))
+
   // --- Reconnecting ----------------------------------------------------------
   const returning = await connect(code, 'Josh', null)
   await sleep(300)

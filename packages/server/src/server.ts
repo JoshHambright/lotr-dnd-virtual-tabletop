@@ -12,7 +12,7 @@ import type { FastifyInstance } from 'fastify'
 import { WebSocketServer } from 'ws'
 import type { WebSocket } from 'ws'
 import type { Invite, RoomState, Role } from '@vtt/core'
-import { emptyRoom, formatInvite, inviteMessage, migrateRoom, parseInvite } from '@vtt/core'
+import { MAX_SEATS, emptyRoom, formatInvite, inviteMessage, migrateRoom, parseInvite } from '@vtt/core'
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '@vtt/protocol'
 import type { Config } from './config.js'
 import { Room } from './room.js'
@@ -268,6 +268,13 @@ export async function createServer(config: Config): Promise<ServerHandle> {
     // than silently demoted, so a mistyped key says so.
     if (url.searchParams.get('role') === 'gm' && role !== 'gm') {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+      return socket.destroy()
+    }
+
+    // A link posted somewhere public should cost a refusal, not a thousand
+    // open sockets.
+    if (room.playerCount >= MAX_SEATS) {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n')
       return socket.destroy()
     }
 

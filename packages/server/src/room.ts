@@ -14,7 +14,16 @@
 import { randomUUID } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
-import { authorize, identityFor, identityForInvite, projectOp, projectState, reduce } from '@vtt/core'
+import {
+  ConnectionLimits,
+  authorize,
+  costOf,
+  identityFor,
+  identityForInvite,
+  projectOp,
+  projectState,
+  reduce,
+} from '@vtt/core'
 import { roll as rollDice } from '@vtt/dice'
 import type { RollMode } from '@vtt/dice'
 import type { ClientMessage, ServerMessage } from '@vtt/protocol'
@@ -27,6 +36,8 @@ interface Seat {
   role: Role
   id: string
   cursor: Presence['cursor']
+  /** What this connection is still allowed to ask for. See core's limits. */
+  limits: ConnectionLimits
   /**
    * How many operations this seat has been sent.
    *
@@ -83,6 +94,7 @@ export class Room {
       role,
       id: playerId ? identityForInvite(playerId) : identityFor(name),
       cursor: null,
+      limits: new ConnectionLimits(),
       // A new connection starts its own count at zero; `hello` says so, and
       // every batch after it follows on.
       seq: 0,
@@ -115,6 +127,17 @@ export class Room {
     const message = parseValidatedClientMessage(raw)
     if (!message) {
       this.#send(seat, { k: 'error', message: 'That message was malformed' })
+      return
+    }
+
+    // Rate limited after parsing, so the cost is known — a token drag and a
+    // scene change arrive the same way and are not the same thing — and
+    // before anything is applied, so being over the limit costs a write to
+    // nothing.
+    if (!seat.limits.allow(costOf(message.k, message.k === 'op' ? message.op.t : undefined))) {
+      if (seat.limits.shouldWarn()) {
+        this.#send(seat, { k: 'error', message: 'Slow down — the table is ignoring some of that' })
+      }
       return
     }
 

@@ -611,3 +611,36 @@ player following one cannot tell, and should not have to.
 
 A forged invite is treated exactly like a missing one. Distinguishing them would
 make the join endpoint an oracle for which player ids exist.
+
+---
+
+## D-032 — Two rate-limit buckets, because the traffic is two kinds
+
+**Decided.** Every connection gets two token buckets. Cursors and token moves
+draw from a fast one (50/s, burst 100); everything else — rolls, chat, and any
+structural change — draws from a slow one (10/s, burst 25). A table holds at
+most 24 seats.
+
+One limit for both would have to be either generous enough for a drag or tight
+enough for chat, and a single number cannot be both. The client throttles a
+drag to roughly 25 moves a second, and two tokens dragged at once is 50; that
+is where the fast limit comes from, not from a guess.
+
+A token bucket rather than a fixed window, because a fixed window lets a client
+send its whole allowance in the last millisecond of one window and again in the
+first of the next — precisely the burst the limit exists to prevent, and
+precisely what a client retrying on a timer produces.
+
+Limits are applied **after parsing and before applying**: after, because the
+cost is not knowable until the message is understood (a token move and a scene
+change arrive identically); before, because a message over the limit should
+cost a write to nothing.
+
+A client over the limit is warned at most every two seconds. It is usually over
+by thousands of messages, and an error for each would be a second flood
+answering the first.
+
+This stops a stuck client, a runaway script and a bored stranger. It does not
+stop a determined attacker, and is not claimed to — the threat it is sized for
+is the one that would actually happen on a Tuesday evening, on a tunnel whose
+URL is the only thing keeping strangers out.

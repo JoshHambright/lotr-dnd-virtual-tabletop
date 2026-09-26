@@ -10,17 +10,22 @@
  * talks on Zoom costs nothing until someone moves a piece.
  */
 
+import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
 import {
+  ConnectionLimits,
+  MAX_LOG_ENTRIES,
+  MAX_SEATS,
+  authorize,
+  costOf,
+  emptyRoom,
   formatInvite,
   identityFor,
   identityForInvite,
   parseInvite,
+  projectOp,
+  projectState,
   reduce,
-  emptyRoom,
-  MAX_LOG_ENTRIES,
 } from '@vtt/core'
-import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
-import { authorize, projectOp, projectState } from '@vtt/core'
 import { DiceError, roll as rollDice } from '@vtt/dice'
 import type { RollMode } from '@vtt/dice'
 import { parseValidatedClientMessage } from '@vtt/protocol/schemas'
@@ -232,6 +237,10 @@ export class TableRoom {
       return respond({ error: 'That GM key is not right for this table' }, 403)
     }
 
+    if (this.ctx.getWebSockets().length >= MAX_SEATS) {
+      return respond({ error: 'That table is full' }, 503)
+    }
+
     const playerId = this.#playerIdFrom(url.searchParams.get('invite'))
     // A table that asks for invites will not take a name instead. The GM is
     // exempt: they hold the key, which is a stronger claim than any invite.
@@ -375,6 +384,25 @@ export class TableRoom {
 
   // --- Websocket -------------------------------------------------------------
 
+  /**
+   * Rate limits, by connection, in memory.
+   *
+   * Not in the attachment, which would mean a storage write for every cursor
+   * move — the very traffic this is here to make cheap. A hibernation wake
+   * therefore hands a connection a full bucket again, which is acceptable
+   * because a client sending enough to be limited is a client keeping the
+   * object awake; hibernation only happens after everybody has gone quiet.
+   */
+  #limits = new Map<string, ConnectionLimits>()
+
+  #limitsFor(connectionId: string): ConnectionLimits {
+    const existing = this.#limits.get(connectionId)
+    if (existing) return existing
+    const fresh = new ConnectionLimits()
+    this.#limits.set(connectionId, fresh)
+    return fresh
+  }
+
   webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): void {
     if (typeof raw !== 'string') return
     if (raw.length > MAX_MESSAGE_BYTES) {
@@ -391,6 +419,17 @@ export class TableRoom {
     const message = parseValidatedClientMessage(raw)
     if (!message) {
       this.#send(ws, { k: 'error', message: 'That message was malformed' })
+      return
+    }
+
+    // Rate limited after parsing, so the cost is known — a token drag and a
+    // scene change arrive the same way and are not the same thing — and before
+    // anything is applied, so being over the limit costs a write to nothing.
+    const limits = this.#limitsFor(attachment.connectionId)
+    if (!limits.allow(costOf(message.k, message.k === 'op' ? message.op.t : undefined))) {
+      if (limits.shouldWarn()) {
+        this.#send(ws, { k: 'error', message: 'Slow down — the table is ignoring some of that' })
+      }
       return
     }
 
@@ -429,12 +468,20 @@ export class TableRoom {
   webSocketClose(ws: WebSocket): void {
     // Flush before the room goes quiet, so nothing is lost if it hibernates.
     if (this.#dirty) this.#persist(true)
+    this.#forget(ws)
     ws.close()
     this.#broadcastPresence()
   }
 
-  webSocketError(): void {
+  webSocketError(ws: WebSocket): void {
+    this.#forget(ws)
     this.#broadcastPresence()
+  }
+
+  /** Drops a departed connection's bucket, so the map tracks the sockets. */
+  #forget(ws: WebSocket): void {
+    const attachment = this.#attachmentOf(ws)
+    if (attachment) this.#limits.delete(attachment.connectionId)
   }
 
   /**
