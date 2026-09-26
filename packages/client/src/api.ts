@@ -96,3 +96,24 @@ export function assetUrl(code: string, assetId: string, gmKey: string | null): s
   const key = gmKey ? `?key=${encodeURIComponent(gmKey)}` : ''
   return `/api/room/${encodeURIComponent(code)}/asset/${encodeURIComponent(assetId)}${key}`
 }
+
+/**
+ * Asks the server for a fresh invite link for one player.
+ *
+ * The id is minted server-side, so calling this twice gives two different
+ * players — which is what you want when handing links out one at a time, and
+ * why there is no "get the invite" to call instead.
+ */
+export async function createInvite(code: string, gmKey: string): Promise<string> {
+  const response = await fetch(`/api/room/${encodeURIComponent(code)}/invite?key=${encodeURIComponent(gmKey)}`, {
+    method: 'POST',
+  })
+  if (!response.ok) throw new Error('The server would not issue an invite')
+  const body = (await response.json()) as { invite: string }
+  return body.invite
+}
+
+/** The link a player follows. The invite only means anything with the table. */
+export function inviteLink(code: string, invite: string): string {
+  return `${location.origin}/?table=${encodeURIComponent(code)}&invite=${encodeURIComponent(invite)}`
+}

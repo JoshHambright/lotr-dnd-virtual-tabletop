@@ -21,8 +21,9 @@ const check = (label, condition) => {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** A socket that records everything it is ever sent. */
-function connect(code, name, key, { claimGm = true } = {}) {
+function connect(code, name, key, { claimGm = true, invite = null } = {}) {
   const params = new URLSearchParams({ name })
+  if (invite) params.set('invite', invite)
   if (key) {
     params.set('key', key)
     if (claimGm) params.set('role', 'gm')
@@ -356,6 +357,51 @@ async function main() {
     allOps(gm).filter((o) => o.t === 'character.upsert').length === before,
   )
   check('and nothing from it reached the table', !everything(player).includes('DEEP-JUNK'))
+
+  // --- Invites ---------------------------------------------------------------
+  // Both hosts sign or store invites differently; what has to match is the
+  // rule, so the same checks run against either.
+  const mintInvite = async (key = gmKey) =>
+    fetch(`${BASE}/api/room/${code}/invite${key ? `?key=${key}` : ''}`, { method: 'POST' })
+
+  check('a player cannot mint an invite', (await mintInvite(null)).status === 403)
+  check('nor can a wrong key', (await mintInvite('not-the-key')).status === 403)
+
+  const invited = await (await mintInvite()).json()
+  check('the GM can mint an invite', typeof invited.invite === 'string' && invited.invite.includes('.'))
+
+  const second = await (await mintInvite()).json()
+  check('every invite is for a different player', invited.invite !== second.invite)
+
+  // An invited player owns their sheet by the invite, not by the name.
+  const invitee = await connect(code, 'Pippin', null, { invite: invited.invite })
+  await sleep(200)
+  invitee.send({
+    k: 'op',
+    op: {
+      t: 'character.upsert',
+      character: { ...sheet, id: 'c-invited', name: 'Pippin', gmNotes: '', values: {} },
+    },
+  })
+  await sleep(300)
+
+  const invitedSheet = allOps(gm)
+    .filter((o) => o.t === 'character.upsert')
+    .at(-1)?.character
+  check('an invited player’s sheet is owned by the invite', invitedSheet?.ownerId?.startsWith('player:') === true)
+
+  // Somebody else typing the same name must not be able to edit it.
+  const sameName = await connect(code, 'Pippin', null)
+  await sleep(200)
+  sameName.send({
+    k: 'op',
+    op: { t: 'character.upsert', character: { ...invitedSheet, values: { stolen: 'SECRET-STOLEN' } } },
+  })
+  await sleep(300)
+  check(
+    'the same name without the invite cannot edit it',
+    everything(sameName).includes('belongs to someone else') && !everything(gm).includes('SECRET-STOLEN'),
+  )
 
   // --- Reconnecting ----------------------------------------------------------
   const returning = await connect(code, 'Josh', null)

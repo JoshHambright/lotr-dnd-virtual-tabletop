@@ -22,7 +22,7 @@ function Demo() {
 
   const { client, transport } = useMemo(() => {
     const transport = new LoopbackTransport(seedDemoRoom())
-    const client = new TableClient('DEMO', 'You', null, transport)
+    const client = new TableClient('DEMO', 'You', null, null, transport)
     client.connect()
     return { client, transport }
   }, [])
@@ -73,7 +73,11 @@ function Demo() {
       </div>
 
       <div className="demo-app">
-        <Table joined={{ code: 'DEMO', name: 'You', gmKey: null }} onLeave={() => reseat('gm')} client={client} />
+        <Table
+          joined={{ code: 'DEMO', name: 'You', gmKey: null, invite: null }}
+          onLeave={() => reseat('gm')}
+          client={client}
+        />
       </div>
     </>
   )

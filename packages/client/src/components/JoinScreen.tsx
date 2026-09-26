@@ -15,9 +15,34 @@ export interface Joined {
   code: string
   name: string
   gmKey: string | null
+  /** Present when this browser followed a link the GM issued. */
+  invite: string | null
 }
 
 const NAME_KEY = 'met.name'
+
+/**
+ * Keeps an invite so a refresh does not turn somebody back into a stranger.
+ *
+ * Stored per table, and alongside the GM key rather than anywhere cleverer,
+ * because it is the same kind of thing: a credential this browser was handed
+ * and needs to keep presenting.
+ */
+export function inviteFor(code: string): string | null {
+  try {
+    return localStorage.getItem(`met.invite.${code}`)
+  } catch {
+    return null
+  }
+}
+
+export function rememberInvite(code: string, invite: string): void {
+  try {
+    localStorage.setItem(`met.invite.${code}`, invite)
+  } catch {
+    // Private browsing: the link still works, it just has to be followed again.
+  }
+}
 
 /** The name this browser last joined with, if any. */
 export function rememberedName(): string {
@@ -67,7 +92,7 @@ export function JoinScreen({ initialCode, onJoin }: { initialCode: string; onJoi
       const room = await createRoom(tableName.trim() || 'A new table')
       rememberGmKey(room.code, room.gmKey)
       remember(name.trim())
-      onJoin({ code: room.code, name: name.trim(), gmKey: room.gmKey })
+      onJoin({ code: room.code, name: name.trim(), gmKey: room.gmKey, invite: null })
     } catch (cause) {
       console.error(cause)
       setError(cause instanceof Error ? cause.message : 'Could not open a table')
@@ -88,7 +113,7 @@ export function JoinScreen({ initialCode, onJoin }: { initialCode: string; onJoi
       return
     }
     remember(name.trim())
-    onJoin({ code: normalized, name: name.trim(), gmKey: gmKeyFor(normalized) })
+    onJoin({ code: normalized, name: name.trim(), gmKey: gmKeyFor(normalized), invite: inviteFor(normalized) })
   }
 
   return (

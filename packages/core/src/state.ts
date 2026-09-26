@@ -178,6 +178,25 @@ export interface RoomSettings {
    * caring. Resolving an id to a pack is the app's job, not the reducer's.
    */
   rulesetId: string
+  /**
+   * When true, a player must arrive with an invite the GM issued.
+   *
+   * Off by default, including for every table that existed before invites did.
+   * A table already running is a table whose players are already trusted, and
+   * turning this on under them would lock them out mid-session; the GM turns it
+   * on when they have handed the links out.
+   */
+  requireInvite: boolean
+  /**
+   * Bumped to invalidate every invite at once.
+   *
+   * It is part of what each invite is signed over, so raising it makes every
+   * link ever issued for this table stop working. That is the whole of
+   * revocation: for five friends round a table, "issue everyone a new link" is
+   * a complete answer, and per-invite revocation would need a store, a list to
+   * keep, and a way for that list to leak.
+   */
+  inviteEpoch: number
   /** When true any player may drag any unlocked token, not just their own. */
   playersCanMoveAnyToken: boolean
   /** When true players may add and delete tokens as well as move them. */
@@ -197,7 +216,7 @@ export const DEFAULT_RULESET_ID = 'lotr5e'
  * any data worth migrating, because retrofitting a version field onto rooms
  * already on disk means guessing which shape each one is.
  */
-export const ROOM_SCHEMA_VERSION = 5
+export const ROOM_SCHEMA_VERSION = 6
 
 export interface RoomState {
   /** The schema this room was written with. See `migrateRoom`. */
@@ -219,7 +238,14 @@ export const MAX_LOG_ENTRIES = 200
 export function emptyRoom(name = 'A new table'): RoomState {
   return {
     schemaVersion: ROOM_SCHEMA_VERSION,
-    settings: { name, rulesetId: DEFAULT_RULESET_ID, playersCanMoveAnyToken: true, playersCanCreateTokens: false },
+    settings: {
+      name,
+      rulesetId: DEFAULT_RULESET_ID,
+      requireInvite: false,
+      inviteEpoch: 1,
+      playersCanMoveAnyToken: true,
+      playersCanCreateTokens: false,
+    },
     scenes: {},
     activeSceneId: null,
     tokens: {},
@@ -539,6 +565,18 @@ const ROOM_MIGRATIONS: Record<number, (room: RoomState) => RoomState> = {
       Object.entries(room.bestiary).map(([id, statBlock]) => [id, toStatBlockBag(statBlock)]),
     ),
   }),
+
+  // Tables gained invites. Off, and epoch 1, because a table that already
+  // exists is one whose players are already at it — switching invites on
+  // underneath them would lock them out of their own game.
+  5: (room) => ({
+    ...room,
+    settings: {
+      ...room.settings,
+      requireInvite: room.settings.requireInvite ?? false,
+      inviteEpoch: room.settings.inviteEpoch || 1,
+    },
+  }),
 }
 
 /** The old fixed stat block, in the one place that still needs to know it. */
@@ -655,4 +693,57 @@ function toValueBag(stored: Character): Character {
  */
 export function identityFor(displayName: string): string {
   return `name:${displayName.trim().toLowerCase()}`
+}
+
+/**
+ * The id an invited player is known by.
+ *
+ * Prefixed differently from a name-derived one so the two can never be mistaken
+ * for each other. That matters: a table that switches invites on must not have
+ * yesterday's `name:sam` quietly satisfy a check meant for a real invite.
+ */
+export function identityForInvite(playerId: string): string {
+  return `player:${playerId}`
+}
+
+/** True for an id that came from a real invite rather than from a typed name. */
+export function isInvitedIdentity(id: string): boolean {
+  return id.startsWith('player:')
+}
+
+/**
+ * An invite, as it travels in a link.
+ *
+ * `<playerId>.<signature>` — the id in the clear so the server knows who is
+ * being claimed, and a signature over the table, the epoch and that id so it
+ * cannot be made up. Signing is each host's own business, because a Worker and
+ * a Node process do not agree about crypto; the shape of the thing is here so
+ * that they agree about that.
+ */
+export interface Invite {
+  playerId: string
+  signature: string
+}
+
+/** What each host signs. Everything that must not be swappable is in it. */
+export function inviteMessage(roomCode: string, epoch: number, playerId: string): string {
+  return `invite:${roomCode}:${epoch}:${playerId}`
+}
+
+export function formatInvite(invite: Invite): string {
+  return `${invite.playerId}.${invite.signature}`
+}
+
+export function parseInvite(token: string): Invite | null {
+  const at = token.indexOf('.')
+  if (at <= 0 || at === token.length - 1) return null
+
+  const playerId = token.slice(0, at)
+  const signature = token.slice(at + 1)
+  // Both halves end up in an id and in a URL, so nothing exotic is allowed
+  // through — an id with a colon in it could forge a prefix.
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(playerId)) return null
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(signature)) return null
+
+  return { playerId, signature }
 }

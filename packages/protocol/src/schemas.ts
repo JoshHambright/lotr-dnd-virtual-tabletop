@@ -149,6 +149,11 @@ export const opSchema = z.discriminatedUnion('t', [
           .min(1)
           .max(64)
           .regex(/^[a-z][a-z0-9-]*$/i),
+        requireInvite: z.boolean(),
+        // Only ever goes up, and only the GM may send it at all; the bound is
+        // there so a stray value cannot put the epoch somewhere no invite this
+        // server signs will ever reach.
+        inviteEpoch: z.number().int().min(1).max(1_000_000),
         playersCanMoveAnyToken: z.boolean(),
         playersCanCreateTokens: z.boolean(),
       })

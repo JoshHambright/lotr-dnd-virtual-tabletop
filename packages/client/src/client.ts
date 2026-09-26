@@ -72,6 +72,14 @@ export class TableClient {
     readonly name: string,
     private gmKeyValue: string | null,
     /**
+     * The invite this browser arrived with, if any.
+     *
+     * Kept for the life of the connection because a reconnect has to present
+     * it again — without it a dropped socket would come back as a different
+     * person and stop owning its own sheet.
+     */
+    readonly invite: string | null = null,
+    /**
      * Injected for the demo and for multi-client tests. Left out in the app,
      * where a websocket to the table server is built from the room code.
      */
@@ -161,6 +169,7 @@ export class TableClient {
   #url(): string {
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
     const params = new URLSearchParams({ name: this.name })
+    if (this.invite) params.set('invite', this.invite)
     if (this.#usingGmKey && this.gmKeyValue) {
       params.set('key', this.gmKeyValue)
       params.set('role', 'gm')

@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { TableClient } from './client.js'
 import type { Joined } from './components/JoinScreen.js'
-import { JoinScreen, gmKeyFor, rememberedName } from './components/JoinScreen.js'
+import { JoinScreen, gmKeyFor, inviteFor, rememberInvite, rememberedName } from './components/JoinScreen.js'
 import { MapView } from './components/MapView.js'
 import type { Tool } from './components/MapView.js'
 import { DicePanel } from './components/DicePanel.js'
@@ -17,6 +17,7 @@ import { ChatPanel } from './components/ChatPanel.js'
 import { CharactersPanel } from './components/CharactersPanel.js'
 import { ScenesPanel } from './components/ScenesPanel.js'
 import { BestiaryPanel } from './components/BestiaryPanel.js'
+import { InvitePanel } from './components/InvitePanel.js'
 import { TokenInspector } from './components/TokenInspector.js'
 import { DiceTray } from './components/DiceTray.js'
 import { GridCalibrator } from './components/GridCalibrator.js'
@@ -38,6 +39,19 @@ export function App() {
   const [joined, setJoined] = useState<Joined | null>(null)
   const initialCode = useMemo(() => new URLSearchParams(location.search).get('table')?.toUpperCase() ?? '', [])
 
+  /**
+   * An invite arriving in the link is kept before anything else happens.
+   *
+   * The GM sends a link once; after that the player refreshes, closes the tab,
+   * comes back next week. Remembering it here means the link is a thing you
+   * follow rather than a thing you have to keep.
+   */
+  const initialInvite = useMemo(() => {
+    const token = new URLSearchParams(location.search).get('invite')
+    if (token && isValidRoomCode(initialCode)) rememberInvite(initialCode, token)
+    return token
+  }, [initialCode])
+
   // A link with ?table=CODE joins straight away if this browser has been here
   // before, which is the common case on session night — and on every refresh.
   // Without this a reload lands on the join screen, where "open a table" is
@@ -50,13 +64,20 @@ export function App() {
     let cancelled = false
     void roomExists(initialCode).then((exists) => {
       if (cancelled) return
-      if (exists) setJoined({ code: initialCode, name: rememberedName(), gmKey: gmKeyFor(initialCode) })
+      if (exists) {
+        setJoined({
+          code: initialCode,
+          name: rememberedName(),
+          gmKey: gmKeyFor(initialCode),
+          invite: initialInvite ?? inviteFor(initialCode),
+        })
+      }
       setRejoining(false)
     })
     return () => {
       cancelled = true
     }
-  }, [canRejoin, initialCode])
+  }, [canRejoin, initialCode, initialInvite])
 
   if (rejoining) {
     return (
@@ -75,7 +96,7 @@ export function App() {
         initialCode={initialCode}
         onJoin={(next) => {
           history.replaceState(null, '', `?table=${next.code}`)
-          setJoined({ ...next, gmKey: next.gmKey ?? gmKeyFor(next.code) })
+          setJoined({ ...next, gmKey: next.gmKey ?? gmKeyFor(next.code), invite: next.invite ?? inviteFor(next.code) })
         }}
       />
     )
@@ -101,7 +122,10 @@ export function Table({
   /** Supplied by the demo, which runs a server in the same tab. */
   client?: TableClient
 }) {
-  const client = useMemo(() => injected ?? new TableClient(joined.code, joined.name, joined.gmKey), [joined, injected])
+  const client = useMemo(
+    () => injected ?? new TableClient(joined.code, joined.name, joined.gmKey, joined.invite),
+    [joined, injected],
+  )
 
   useEffect(() => {
     client.connect()
@@ -517,6 +541,7 @@ export function Table({
                 />
                 Players can add and remove tokens
               </label>
+              {joined.gmKey ? <InvitePanel client={client} settings={room.settings} gmKey={joined.gmKey} /> : null}
             </div>
           ) : null}
         </aside>

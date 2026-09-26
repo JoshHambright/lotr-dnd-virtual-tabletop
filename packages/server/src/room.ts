@@ -14,7 +14,7 @@
 import { randomUUID } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
-import { authorize, identityFor, projectOp, projectState, reduce } from '@vtt/core'
+import { authorize, identityFor, identityForInvite, projectOp, projectState, reduce } from '@vtt/core'
 import { roll as rollDice } from '@vtt/dice'
 import type { RollMode } from '@vtt/dice'
 import type { ClientMessage, ServerMessage } from '@vtt/protocol'
@@ -67,13 +67,21 @@ export class Room {
 
   // --- Seats -----------------------------------------------------------------
 
-  join(socket: WebSocket, name: string, role: Role): Seat {
+  /**
+   * Seats somebody.
+   *
+   * `playerId` is present when they arrived with an invite the server verified,
+   * and it is what ownership is then checked against. Without one the id comes
+   * from the name they typed, which is worth exactly what a typed name is worth
+   * — see D-017, and the table setting that refuses it.
+   */
+  join(socket: WebSocket, name: string, role: Role, playerId?: string | null): Seat {
     const seat: Seat = {
       socket,
       connectionId: randomUUID(),
       name,
       role,
-      id: identityFor(name),
+      id: playerId ? identityForInvite(playerId) : identityFor(name),
       cursor: null,
       // A new connection starts its own count at zero; `hello` says so, and
       // every batch after it follows on.

@@ -169,7 +169,7 @@ app and reshapes the sheets.
 ### Phase 3 — Hardening for real sessions
 
 - Reconnection tested against genuine network loss, not a clean socket close
-- Per-player invite tokens, replacing name-derived ids (D-017)
+- ✅ Per-player invite tokens, replacing name-derived ids (D-017, done in D-031)
 - Rate limiting, message size caps, abuse resistance on a public tunnel
 - Load check: six clients, sustained token dragging, a large map
 - Accessibility pass: keyboard navigation, focus order, contrast in all three skins

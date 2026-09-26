@@ -252,7 +252,7 @@ with one pack written, not in Phase 2 with three.
 
 ---
 
-## D-017 — Ownership by id now, tokens later
+## D-017 — Ownership by id now, tokens later _(the tokens are here: D-031)_
 
 **Decided.** Players are identified by a display name, but ownership is checked
 against an _id_, which is currently derived from that name.
@@ -576,3 +576,38 @@ and a refusal is swallowed: the honest outcome is that the button did not work,
 which the returned state already says. Escape and F11 leave full screen without
 going near the button, so the label follows `fullscreenchange` rather than a
 boolean of our own.
+
+---
+
+## D-031 — Invites, and what revocation is worth
+
+**Decided.** The GM issues a per-player link. A browser that follows one is
+known by the invite rather than by the name somebody typed, and a table can be
+set to refuse anyone without one. Revocation is all-or-nothing: an epoch in the
+table's settings is part of what every invite is signed over, and raising it
+retires every link at once.
+
+D-017 bought the indirection for exactly this, and the bet paid: `authorize`,
+the sheet model and the reconnect path are untouched. What changed is
+`identityFor`'s neighbours and the join handshake, as predicted.
+
+**Off by default, including for tables that already exist.** A table already
+running is one whose players are already at it, and switching this on
+underneath them would lock them out mid-session. The GM turns it on when the
+links are handed out.
+
+**All-or-nothing revocation is the whole feature, not a first cut.** Per-invite
+revocation needs a list of who holds what: something to keep, to migrate, to
+export, and to leak. For five friends round a table, "everyone gets a new link"
+is a complete answer to every question revocation actually gets asked.
+
+The two hosts differ in mechanism and agree on rule, exactly as they already do
+for the GM key. The Node server derives invites from `TABLE_SECRET`, so there is
+nothing to store and a link survives a restart. A Worker has no long-lived
+secret, so the Durable Object stores the ones it issued — bounded, because a GM
+holding down "new link" should cost links and not a room that will not load. The
+link format is identical either way, which is the part that has to match: a
+player following one cannot tell, and should not have to.
+
+A forged invite is treated exactly like a missing one. Distinguishing them would
+make the join endpoint an oracle for which player ids exist.

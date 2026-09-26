@@ -10,7 +10,15 @@
  * talks on Zoom costs nothing until someone moves a piece.
  */
 
-import { identityFor, reduce, emptyRoom, MAX_LOG_ENTRIES } from '@vtt/core'
+import {
+  formatInvite,
+  identityFor,
+  identityForInvite,
+  parseInvite,
+  reduce,
+  emptyRoom,
+  MAX_LOG_ENTRIES,
+} from '@vtt/core'
 import type { ChatMessage, Op, Presence, Role, Roll, RoomState } from '@vtt/core'
 import { authorize, projectOp, projectState } from '@vtt/core'
 import { DiceError, roll as rollDice } from '@vtt/dice'
@@ -25,6 +33,8 @@ interface Attachment {
   name: string
   role: Role
   cursor: Presence['cursor']
+  /** Who this connection is, for ownership checks. See core's `identityFor`. */
+  id: string
   /**
    * How many operations this socket has been sent.
    *
@@ -40,6 +50,10 @@ interface Attachment {
    */
   seq: number
 }
+
+/** Invites a table will remember. A GM clicking a button must not be able
+ *  to grow the room's storage without bound. */
+const MAX_INVITES = 200
 
 const MAX_ASSET_BYTES = 12 * 1024 * 1024
 const ASSET_CHUNK = 64 * 1024
@@ -126,6 +140,11 @@ export class TableRoom {
     if (url.pathname.startsWith('/asset/') && request.method === 'GET') {
       return this.#downloadAsset(url.pathname.slice('/asset/'.length), url)
     }
+    if (url.pathname === '/invite' && request.method === 'POST') {
+      if (!this.#state) return respond({ error: 'No table with that code' }, 404)
+      if (!this.#isGm(url.searchParams.get('key'))) return respond({ error: 'Only the GM may invite' }, 403)
+      return respond({ invite: this.#mintInvite() })
+    }
     if (url.pathname === '/exists') {
       return respond({ exists: this.#state !== null, name: this.#state?.settings.name ?? null })
     }
@@ -144,6 +163,60 @@ export class TableRoom {
     return respond({ ok: true })
   }
 
+  /**
+   * Invites this table has issued, as `<playerId>.<signature>` with the epoch
+   * they were made at.
+   *
+   * Stored rather than derived, unlike the Node server, for the same reason the
+   * GM key is: a Worker has no long-lived secret of its own to sign with, and
+   * the Durable Object *is* the table's storage. The link format is identical
+   * either way, which is the part that has to match — a player following a link
+   * cannot tell, and should not have to.
+   */
+  #invites(): { epoch: number; token: string }[] {
+    const raw = this.#readMeta('invites')
+    if (!raw) return []
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      return Array.isArray(parsed) ? (parsed as { epoch: number; token: string }[]) : []
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Mints one, and forgets the oldest once there are too many.
+   *
+   * A bound rather than unlimited growth: this lives in the table's own
+   * storage, and a GM clicking "new link" a thousand times should cost a
+   * thousand links, not a room that will not load.
+   */
+  #mintInvite(): string {
+    if (!this.#state) return ''
+    const playerId = crypto.randomUUID().replaceAll('-', '')
+    const signature = [...crypto.getRandomValues(new Uint8Array(24))]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+    const token = formatInvite({ playerId, signature })
+
+    const kept = [...this.#invites(), { epoch: this.#state.settings.inviteEpoch, token }].slice(-MAX_INVITES)
+    this.#writeMeta('invites', JSON.stringify(kept))
+    return token
+  }
+
+  /** The player an invite is for, or null for anything that does not check out. */
+  #playerIdFrom(token: string | null): string | null {
+    if (!this.#state || !token) return null
+    const offered = parseInvite(token)
+    if (!offered) return null
+
+    const epoch = this.#state.settings.inviteEpoch
+    // Compared in constant time and only against invites of the current epoch,
+    // so a bump retires every link without having to delete anything.
+    const match = this.#invites().some((entry) => entry.epoch === epoch && safeEqual(entry.token, token))
+    return match ? offered.playerId : null
+  }
+
   #connect(request: Request, url: URL): Response {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       return respond({ error: 'Expected a websocket' }, 426)
@@ -159,11 +232,25 @@ export class TableRoom {
       return respond({ error: 'That GM key is not right for this table' }, 403)
     }
 
+    const playerId = this.#playerIdFrom(url.searchParams.get('invite'))
+    // A table that asks for invites will not take a name instead. The GM is
+    // exempt: they hold the key, which is a stronger claim than any invite.
+    if (this.#state.settings.requireInvite && role !== 'gm' && !playerId) {
+      return respond({ error: 'This table is invite only' }, 403)
+    }
+
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
 
-    const attachment: Attachment = { connectionId: crypto.randomUUID(), name, role, cursor: null, seq: 0 }
+    const attachment: Attachment = {
+      connectionId: crypto.randomUUID(),
+      name,
+      role,
+      cursor: null,
+      seq: 0,
+      id: playerId ? identityForInvite(playerId) : identityFor(name),
+    }
     this.ctx.acceptWebSocket(server)
     server.serializeAttachment(attachment)
 
@@ -360,7 +447,10 @@ export class TableRoom {
    */
   #attachmentOf(socket: WebSocket): Attachment | null {
     const raw = socket.deserializeAttachment() as Attachment | null
-    return raw ? { ...raw, seq: raw.seq ?? 0 } : null
+    if (!raw) return null
+    // A socket hibernating across the deploy that added these comes back
+    // without them; the name-derived id is exactly what it had before.
+    return { ...raw, seq: raw.seq ?? 0, id: raw.id ?? identityFor(raw.name) }
   }
 
   #handleCursor(ws: WebSocket, attachment: Attachment, message: Extract<ClientMessage, { k: 'cursor' }>): void {
@@ -385,7 +475,9 @@ export class TableRoom {
     const decision = authorize(message.op, state, {
       role: attachment.role,
       name: attachment.name,
-      id: identityFor(attachment.name),
+      // The id settled when the connection was made; re-deriving it from the
+      // name here would quietly undo an invite.
+      id: attachment.id ?? identityFor(attachment.name),
     })
     if (!decision.ok) {
       this.#send(ws, { k: 'error', message: decision.reason })

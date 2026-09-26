@@ -4,15 +4,15 @@
  * which it reached.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import type { FastifyInstance } from 'fastify'
 import { WebSocketServer } from 'ws'
 import type { WebSocket } from 'ws'
-import type { RoomState, Role } from '@vtt/core'
-import { emptyRoom, migrateRoom } from '@vtt/core'
+import type { Invite, RoomState, Role } from '@vtt/core'
+import { emptyRoom, formatInvite, inviteMessage, migrateRoom, parseInvite } from '@vtt/core'
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '@vtt/protocol'
 import type { Config } from './config.js'
 import { Room } from './room.js'
@@ -61,6 +61,40 @@ export async function createServer(config: Config): Promise<ServerHandle> {
     return expected.length === given.length && timingSafeEqual(expected, given)
   }
 
+  /**
+   * Signs an invite for one player at this table.
+   *
+   * Derived rather than stored, like the GM key: nothing to keep, nothing to
+   * lose in a backup, and the link still works after a restart. What it is
+   * signed over — the table, the epoch and the player id — is defined in core
+   * so that the Worker signs the same thing.
+   */
+  const inviteFor = (code: string, epoch: number, playerId: string): Invite => ({
+    playerId,
+    signature: createHmac('sha256', config.tableSecret)
+      .update(inviteMessage(code, epoch, playerId))
+      .digest('base64url'),
+  })
+
+  /**
+   * Checks an invite, and says who it is for.
+   *
+   * Returns null for anything that does not verify, and the caller treats that
+   * the same as no invite at all — a forged token must not be distinguishable
+   * from a missing one, or it becomes an oracle.
+   */
+  const playerIdFrom = (code: string, epoch: number, token: string | undefined): string | null => {
+    if (!token) return null
+    const offered = parseInvite(token)
+    if (!offered) return null
+
+    const expected = Buffer.from(inviteFor(code, epoch, offered.playerId).signature)
+    const given = Buffer.from(offered.signature)
+    // Constant time, so a signature cannot be probed byte by byte.
+    if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null
+    return offered.playerId
+  }
+
   app.addContentTypeParser(IMAGE_TYPES, { parseAs: 'buffer' }, (_request, body, done) => done(null, body))
 
   // The app and its websocket on one origin: no CORS, one URL to hand out.
@@ -95,6 +129,26 @@ export async function createServer(config: Config): Promise<ServerHandle> {
     store.createRoom(code, gmKey, state)
     return { code, gmKey }
   })
+
+  /**
+   * Mints an invite link for one player. GM only, obviously.
+   *
+   * The id is generated here rather than taken from the caller so that two
+   * players cannot be handed the same one by accident, and so that nothing a
+   * GM types ends up inside a signed message.
+   */
+  app.post<{ Params: { code: string }; Querystring: { key?: string } }>(
+    '/api/room/:code/invite',
+    async (request, reply) => {
+      const code = normalizeRoomCode(request.params.code)
+      const room = isValidRoomCode(code) ? roomFor(code) : null
+      if (!room) return reply.code(404).send({ error: 'No table with that code' })
+      if (!isGm(code, request.query.key)) return reply.code(403).send({ error: 'Only the GM may invite' })
+
+      const playerId = randomUUID().replaceAll('-', '')
+      return { invite: formatInvite(inviteFor(code, room.snapshot.settings.inviteEpoch, playerId)) }
+    },
+  )
 
   app.get<{ Params: { code: string } }>('/api/room/:code/exists', async (request) => {
     const code = normalizeRoomCode(request.params.code)
@@ -217,8 +271,18 @@ export async function createServer(config: Config): Promise<ServerHandle> {
       return socket.destroy()
     }
 
+    const settings = room.snapshot.settings
+    const playerId = playerIdFrom(code, settings.inviteEpoch, url.searchParams.get('invite') ?? undefined)
+
+    // A table that asks for invites will not take a name instead. The GM is
+    // exempt: they hold the key, which is a stronger claim than any invite.
+    if (settings.requireInvite && role !== 'gm' && !playerId) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+      return socket.destroy()
+    }
+
     sockets.handleUpgrade(request, socket, head, (ws: WebSocket) => {
-      const seat = room.join(ws, name, role)
+      const seat = room.join(ws, name, role, playerId)
       ws.on('message', (data) => room.receive(seat, data.toString()))
       ws.on('close', () => room.leave(seat))
       ws.on('error', () => room.leave(seat))
